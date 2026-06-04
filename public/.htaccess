@@ -1,0 +1,9 @@
+Options -MultiViews
+RewriteEngine On
+RewriteBase /
+RewriteRule ^index\.html$ - [L]
+# No reescribir las llamadas a la API (las maneja el ProxyPass del vhost)
+RewriteCond %{REQUEST_URI} !^/(api|storage)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]

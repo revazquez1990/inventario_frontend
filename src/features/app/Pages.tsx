@@ -2,10 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowDownToLine,
   BadgeDollarSign,
+  ChevronDown,
   Edit3,
   FileSpreadsheet,
   FileText,
-  PlusCircle,
+  ImageIcon,
   PackagePlus,
   Plus,
   RefreshCw,
@@ -13,14 +14,17 @@ import {
   Trash2,
   Upload,
   Users,
+  X,
   XCircle,
 } from 'lucide-react'
-import { useMemo, useState, type FormEvent } from 'react'
+import React, { useMemo, useState, type FormEvent } from 'react'
 import { apiClient, extractApiError } from '@/api/client'
 import {
   type Movement,
   type ImportPreview,
   type OptionItem,
+  type Product,
+  type ProductHistoryEntry,
   useDelete,
   useList,
   useMovements,
@@ -51,7 +55,7 @@ function Card({ children }: { children: React.ReactNode }) {
   return <section className="rounded-md border border-[#d8d2c2] bg-[#fbfaf5] p-5">{children}</section>
 }
 
-function Field({ label, name, type = 'text', required = false, defaultValue = '' }: { label: string; name: string; type?: string; required?: boolean; defaultValue?: string | number }) {
+function Field({ label, name, type = 'text', required = false, defaultValue = '', onChange }: { label: string; name: string; type?: string; required?: boolean; defaultValue?: string | number; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
   return (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-[#3d443b]">{label}</span>
@@ -61,6 +65,7 @@ function Field({ label, name, type = 'text', required = false, defaultValue = ''
         type={type}
         required={required}
         defaultValue={defaultValue}
+        onChange={onChange}
       />
     </label>
   )
@@ -91,7 +96,7 @@ function ErrorText({ error }: { error: unknown }) {
 
 function SubmitButton({ label, icon = <Save className="size-4" /> }: { label: string; icon?: React.ReactNode }) {
   return (
-    <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#16372f] px-4 font-semibold text-white hover:bg-[#0f2b25]" type="submit">
+    <button className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md bg-[#16372f] px-4 font-semibold text-white hover:bg-[#0f2b25]" type="submit">
       {icon}
       {label}
     </button>
@@ -101,7 +106,7 @@ function SubmitButton({ label, icon = <Save className="size-4" /> }: { label: st
 function ActionButton({ children, onClick, danger = false }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
   return (
     <button
-      className={`inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium ${danger ? 'border-[#d69a8a] text-[#8a2d1b] hover:bg-[#fff1ea]' : 'border-[#c9c5b8] text-[#3d443b] hover:bg-[#eee9dc]'}`}
+      className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium ${danger ? 'border-[#d69a8a] text-[#8a2d1b] hover:bg-[#fff1ea]' : 'border-[#c9c5b8] text-[#3d443b] hover:bg-[#eee9dc]'}`}
       type="button"
       onClick={onClick}
     >
@@ -132,7 +137,7 @@ export function DashboardPageFull() {
     ['Ventas de hoy', `USD ${Number(kpis.data?.sales_total_usd ?? 0).toFixed(2)}`],
     ['Total CUP', `CUP ${Number(kpis.data?.sales_total_cup ?? 0).toFixed(2)}`],
     ['Movimientos', String(kpis.data?.movements_count ?? 0)],
-    ['Bajo mínimo', String(kpis.data?.low_stock_count ?? 0)],
+    ['Sin stock', String(kpis.data?.low_stock_count ?? 0)],
   ]
 
   return (
@@ -152,6 +157,238 @@ export function DashboardPageFull() {
         ))}
       </div>
     </AppShell>
+  )
+}
+
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10" onClick={onClose}>
+      <div className="my-4 w-full max-w-lg rounded-xl border border-[#e8e3d4] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[#e8e3d4] px-5 py-4">
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <button type="button" className="cursor-pointer rounded-md p-1 text-[#687168] hover:bg-[#eee9dc] hover:text-[#3d443b]" onClick={onClose}>
+            <X className="size-5" />
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-t border-[#e8e3d4] pt-4">
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center justify-between rounded-md py-1 text-sm font-semibold text-[#3d443b] hover:text-[#16372f]"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>{title}</span>
+        <ChevronDown className={`size-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="mt-3">{children}</div>}
+    </div>
+  )
+}
+
+function ProductDetailModal({ product, onClose }: { product: Product; onClose: () => void }) {
+  const [historyEnabled, setHistoryEnabled] = useState(false)
+  const rateQuery = useQuery({
+    queryKey: ['rate-today'],
+    queryFn: async () => (await apiClient.get('/exchange-rate/today')).data as { exists: boolean; rate?: { usd_to_cup: string } },
+  })
+  const rate = Number(rateQuery.data?.rate?.usd_to_cup ?? 1)
+  const historyQuery = useQuery({
+    queryKey: ['product-history', product.id],
+    queryFn: async () => (await apiClient.get<{ data: ProductHistoryEntry[] }>(`/products/${product.id}/movements`)).data.data,
+    enabled: historyEnabled,
+  })
+
+  const typeColor: Record<string, string> = {
+    entrada: 'bg-[#edf4ef] text-[#16372f]',
+    salida: 'bg-[#fff1ea] text-[#8a2d1b]',
+    venta: 'bg-[#fff1ea] text-[#8a2d1b]',
+    ajuste: 'bg-[#f0f0f0] text-[#3d443b]',
+    anulacion: 'bg-[#f0f0f0] text-[#687168] line-through',
+  }
+
+  return (
+    <ModalShell title={product.name} onClose={onClose}>
+      <div className="space-y-5">
+        {product.image_url && (
+          <img src={product.image_url} alt={product.name} className="h-36 w-36 rounded-lg border border-[#e8e3d4] object-cover" />
+        )}
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          {([
+            ['Código', product.code],
+            ['Estado', product.status],
+            ['Categoría', product.category?.name ?? '—'],
+            ['Unidad', product.unit?.name ?? '—'],
+            ['Referencia', product.reference || '—'],
+            ['Fecha de alta', product.created_at ? new Date(product.created_at).toLocaleDateString('es-ES') : '—'],
+          ] as [string, string][]).map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs text-[#687168]">{label}</dt>
+              <dd className="font-medium">{value}</dd>
+            </div>
+          ))}
+          <div>
+            <dt className="text-xs text-[#687168]">Precio</dt>
+            <dd className="font-medium"><MoneyDisplay compact usd={product.price} rate={rate} /></dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[#687168]">Stock actual</dt>
+            <dd><StockBadge stock={product.quantity} /></dd>
+          </div>
+        </dl>
+
+        <Accordion title="Historial de movimientos" >
+          {!historyEnabled && (
+            <button
+              type="button"
+              className="cursor-pointer text-sm text-[#16372f] underline"
+              onClick={() => setHistoryEnabled(true)}
+            >
+              Cargar historial
+            </button>
+          )}
+          {historyEnabled && historyQuery.isPending && <p className="text-sm text-[#687168]">Cargando...</p>}
+          {historyEnabled && historyQuery.isError && <p className="text-sm text-[#8a2d1b]">Error al cargar el historial.</p>}
+          {historyEnabled && historyQuery.data?.length === 0 && <p className="text-sm text-[#687168]">Sin movimientos registrados.</p>}
+          <div className="space-y-2">
+            {(historyQuery.data ?? []).map((entry) => (
+              <div key={entry.id} className="rounded-md border border-[#e8e3d4] bg-[#f8f6ef] p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${typeColor[entry.type] ?? ''}`}>{entry.type}</span>
+                  <span className="font-mono text-xs text-[#687168]">{entry.code}</span>
+                  <span className="ml-auto text-xs text-[#687168]">{new Date(entry.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="text-[#687168]">{entry.created_by ?? 'Sistema'}{entry.supplier ? ` · ${entry.supplier}` : ''}</span>
+                  <span className={`font-semibold ${entry.type === 'entrada' ? 'text-[#276143]' : 'text-[#8a2d1b]'}`}>
+                    {entry.type === 'entrada' ? '+' : '−'}{entry.quantity} uds
+                  </span>
+                </div>
+                {entry.reason && <p className="mt-1 text-xs text-[#687168]">Motivo: {entry.reason}</p>}
+                {entry.status === 'anulado' && <p className="mt-1 text-xs font-medium text-[#8a2d1b]">Anulado</p>}
+              </div>
+            ))}
+          </div>
+        </Accordion>
+      </div>
+    </ModalShell>
+  )
+}
+
+function MovementDetailModal({ movement, onClose }: { movement: Movement; onClose: () => void }) {
+  const detailQuery = useQuery({
+    queryKey: ['movement-detail', movement.id],
+    queryFn: async () => (await apiClient.get<{ data: Movement }>(`/movements/${movement.id}`)).data.data,
+  })
+  const m = detailQuery.data ?? movement
+
+  const typeLabel: Record<string, string> = { entrada: 'Entrada', salida: 'Salida', venta: 'Venta', ajuste: 'Ajuste', anulacion: 'Anulación' }
+  const typeColor: Record<string, string> = {
+    entrada: 'bg-[#edf4ef] text-[#16372f]',
+    salida: 'bg-[#fff1ea] text-[#8a2d1b]',
+    venta: 'bg-[#fff1ea] text-[#8a2d1b]',
+    ajuste: 'bg-[#f0f0f0] text-[#3d443b]',
+    anulacion: 'bg-[#f0f0f0] text-[#687168]',
+  }
+
+  return (
+    <ModalShell title={`Movimiento ${m.code}`} onClose={onClose}>
+      {detailQuery.isPending ? (
+        <p className="text-sm text-[#687168]">Cargando...</p>
+      ) : (
+        <div className="space-y-5 text-sm">
+          {/* header badges */}
+          <div className="flex flex-wrap gap-2">
+            <span className={`rounded-md px-2.5 py-1 text-xs font-semibold capitalize ${typeColor[m.type] ?? ''}`}>{typeLabel[m.type] ?? m.type}</span>
+            {m.adjustment_subtype && <span className="rounded-md bg-[#f0f0f0] px-2.5 py-1 text-xs font-medium capitalize">{m.adjustment_subtype}</span>}
+            <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${m.status === 'anulado' ? 'bg-[#fff1ea] text-[#8a2d1b]' : 'bg-[#edf4ef] text-[#16372f]'}`}>{m.status}</span>
+          </div>
+
+          {/* totals */}
+          <div className="rounded-md border border-[#e8e3d4] bg-[#f8f6ef] p-3">
+            <p className="text-xs text-[#687168]">Total</p>
+            <MoneyDisplay usd={m.totals.with_tax_usd} cup={m.totals.with_tax_cup} rate={Number(m.exchange_rate_snapshot)} />
+            <p className="mt-1 text-xs text-[#687168]">ratio {m.exchange_rate_snapshot} · impuesto {m.tax_rate_snapshot}%</p>
+          </div>
+
+          {/* items */}
+          <div>
+            <p className="mb-2 font-semibold">Productos</p>
+            <div className="divide-y divide-[#e8e3d4] rounded-md border border-[#e8e3d4]">
+              {m.items.map((item, i) => (
+                <div key={i} className="flex items-start justify-between gap-3 px-3 py-2">
+                  <div>
+                    <p className="font-medium">{item.product_name}</p>
+                    <p className="text-xs text-[#687168]">Código: {item.code}</p>
+                  </div>
+                  <div className="text-right">
+                    <p>{item.quantity} uds</p>
+                    {item.unit_price_with_tax_usd && <p className="text-xs text-[#687168]">USD {item.unit_price_with_tax_usd} / u</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* metadata */}
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
+            {m.supplier && (
+              <div className="col-span-2">
+                <dt className="text-xs text-[#687168]">Proveedor</dt>
+                <dd className="font-medium">{m.supplier.name}</dd>
+              </div>
+            )}
+            {m.reason && (
+              <div className="col-span-2">
+                <dt className="text-xs text-[#687168]">Motivo</dt>
+                <dd className="font-medium">{m.reason}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-xs text-[#687168]">Creado por</dt>
+              <dd className="font-medium">{m.created_by?.name ?? '—'}</dd>
+              <dd className="text-xs text-[#687168]">{m.created_by?.email}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[#687168]">Fecha</dt>
+              <dd className="font-medium">{m.created_at ? new Date(m.created_at).toLocaleDateString('es-ES') : '—'}</dd>
+              <dd className="text-xs text-[#687168]">{m.created_at ? new Date(m.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : ''}</dd>
+            </div>
+          </dl>
+
+          {/* void info */}
+          {m.voided_by && (
+            <div className="rounded-md border border-[#d69a8a] bg-[#fff1ea] p-3">
+              <p className="mb-2 font-semibold text-[#8a2d1b]">Información de anulación</p>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2">
+                <div>
+                  <dt className="text-xs text-[#687168]">Anulado por</dt>
+                  <dd className="font-medium">{m.voided_by.name}</dd>
+                  <dd className="text-xs text-[#687168]">{m.voided_by.email}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[#687168]">Fecha de anulación</dt>
+                  <dd className="font-medium">{m.voided_at ? new Date(m.voided_at).toLocaleDateString('es-ES') : '—'}</dd>
+                </div>
+                {m.reason_void && (
+                  <div className="col-span-2">
+                    <dt className="text-xs text-[#687168]">Motivo de anulación</dt>
+                    <dd className="font-medium">{m.reason_void}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
+        </div>
+      )}
+    </ModalShell>
   )
 }
 
@@ -197,7 +434,7 @@ function SimpleCatalogPage({ title, endpoint, queryKey, fields }: { title: strin
             <ErrorText error={create.error ?? update.error ?? remove.error} />
             <div className="flex flex-wrap gap-2">
               <SubmitButton label={editing ? 'Actualizar' : 'Guardar'} icon={editing ? <Edit3 className="size-4" /> : <Plus className="size-4" />} />
-              {editing ? <button className="h-11 rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setEditing(null)}>Cancelar</button> : null}
+              {editing ? <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setEditing(null)}>Cancelar</button> : null}
             </div>
           </form>
         </Card>
@@ -208,7 +445,6 @@ function SimpleCatalogPage({ title, endpoint, queryKey, fields }: { title: strin
                 {(items.data ?? []).map((item) => (
                   <tr key={String(item.id)} className="border-b border-[#e8e3d4] last:border-0">
                     {fields.slice(0, 3).map(([name]) => <td key={name} className="py-3 pr-4">{String(item[name] ?? '')}</td>)}
-                    <td className="py-3 text-[#687168]">{String(item.status ?? '')}</td>
                     <td className="py-3">
                       <div className="flex flex-wrap gap-2">
                         <ActionButton onClick={() => setEditing(item)}><Edit3 className="size-4" /> Editar</ActionButton>
@@ -261,7 +497,7 @@ export function AttributesPage() {
               <p className="mt-2 text-sm text-[#687168]">{attribute.values.map((value) => value.value).join(', ') || 'Sin valores'}</p>
               <form className="mt-3 flex gap-2" onSubmit={(event) => submitValue(event, attribute.id)}>
                 <input className="h-10 min-w-0 flex-1 rounded-md border border-[#c9c5b8] px-3 text-sm" name="value" placeholder="Nuevo valor" required />
-                <button className="h-10 rounded-md border border-[#c9c5b8] px-3 text-sm font-medium" type="submit">Agregar</button>
+                <button className="h-10 cursor-pointer rounded-md border border-[#c9c5b8] px-3 text-sm font-medium" type="submit">Agregar</button>
               </form>
             </Card>
           ))}
@@ -274,40 +510,65 @@ export function AttributesPage() {
 export function ProductsPage() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [belowMin, setBelowMin] = useState(false)
   const params = useMemo(() => {
     const query = new URLSearchParams()
     if (search) query.set('search', search)
     if (categoryFilter) query.set('category_id', categoryFilter)
-    if (belowMin) query.set('below_min', 'true')
     const value = query.toString()
     return value ? `?${value}` : ''
-  }, [belowMin, categoryFilter, search])
+  }, [categoryFilter, search])
   const products = useProducts(params)
   const categories = useList<OptionItem>('categories', '/categories')
   const units = useList<OptionItem>('units', '/units')
-  const create = usePost<Record<string, unknown>>(['products'])
-  const updateProduct = usePut<Record<string, unknown>>(['products'])
-  const updateVariant = usePut<Record<string, unknown>>(['products'])
+  const queryClient = useQueryClient()
+  const rateQuery = useQuery({
+    queryKey: ['rate-today'],
+    queryFn: async () => (await apiClient.get('/exchange-rate/today')).data as { exists: boolean; rate?: { usd_to_cup: string } },
+  })
+  const todayRate = Number(rateQuery.data?.rate?.usd_to_cup ?? 1)
   const remove = useDelete(['products'])
   const [editingProduct, setEditingProduct] = useState<number | null>(null)
-  const [variants, setVariants] = useState<Array<{ sku: string; price_with_tax: string }>>([{ sku: '', price_with_tax: '' }])
+  const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
+  const [initialQty, setInitialQty] = useState(0)
+  const suppliersForCreate = useList<OptionItem>('suppliers', '/suppliers')
   const [preview, setPreview] = useState<ImportPreview | null>(null)
+
+  const saveMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const id = formData.get('_id')
+      if (id) {
+        formData.delete('_id')
+        formData.append('_method', 'PUT')
+        return (await apiClient.post(`/products/${String(id)}`, formData)).data
+      }
+      return (await apiClient.post('/products', formData)).data
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['products'] })
+      await queryClient.invalidateQueries({ queryKey: ['movements'] })
+      setImageFile(null)
+      setEditingProduct(null)
+      setInitialQty(0)
+    },
+  })
+
   const previewMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData()
       formData.append('file', file)
-      const { data } = await apiClient.post<{ data: ImportPreview }>('/products/import/preview', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const { data } = await apiClient.post<{ data: ImportPreview }>('/products/import/preview', formData)
       return data.data
     },
     onSuccess: setPreview,
   })
+
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData()
       formData.append('file', file)
-      return (await apiClient.post('/products/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } })).data
+      return (await apiClient.post('/products/import', formData)).data
     },
     onSuccess: () => {
       setPreview(null)
@@ -328,24 +589,21 @@ export function ProductsPage() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const data = formDataToObject(new FormData(event.currentTarget))
-    const input = {
-      name: stringOrEmpty(data.name),
-      description: stringOrEmpty(data.description),
-      sku_base: stringOrEmpty(data.sku_base),
-      category_id: numberOrZero(stringOrEmpty(data.category_id)),
-      unit_id: numberOrZero(stringOrEmpty(data.unit_id)),
-      min_stock: numberOrZero(stringOrEmpty(data.min_stock)),
-      variants: variants.filter((variant) => variant.sku.trim() !== '').map((variant) => ({ sku: variant.sku, price_with_tax: numberOrZero(variant.price_with_tax) })),
-    }
-    if (editingProduct) {
-      updateProduct.mutate({ path: `/products/${editingProduct}`, input })
-    } else {
-      create.mutate({ path: '/products', input })
-    }
+    const raw = new FormData(event.currentTarget)
+    const formData = new FormData()
+    formData.append('code', String(raw.get('code') ?? ''))
+    formData.append('name', String(raw.get('name') ?? ''))
+    formData.append('category_id', String(raw.get('category_id') ?? ''))
+    formData.append('unit_id', String(raw.get('unit_id') ?? ''))
+    formData.append('price', String(raw.get('price') ?? ''))
+    formData.append('reference', String(raw.get('reference') ?? ''))
+    formData.append('quantity', String(raw.get('quantity') ?? '0'))
+    if (!editingProduct && initialQty > 0) formData.append('supplier_id', String(raw.get('supplier_id') ?? ''))
+    if (imageFile) formData.append('image', imageFile)
+    if (editingProduct) formData.append('_id', String(editingProduct))
+    saveMutation.mutate(formData)
     event.currentTarget.reset()
-    setVariants([{ sku: '', price_with_tax: '' }])
-    setEditingProduct(null)
+    setImageFile(null)
   }
 
   function previewUpload(event: FormEvent<HTMLFormElement>) {
@@ -357,66 +615,84 @@ export function ProductsPage() {
     }
   }
 
-  function editProduct(productId: number) {
-    const product = products.data?.find((item) => item.id === productId)
-    if (!product) return
+  function startEdit(product: Product) {
     setEditingProduct(product.id)
-    setVariants(product.variants.map((variant) => ({ sku: variant.sku, price_with_tax: variant.price_with_tax })))
+    setImageFile(null)
+    setInitialQty(0)
   }
+
+  function cancelEdit() {
+    setEditingProduct(null)
+    setImageFile(null)
+  }
+
+  const editing = products.data?.find((item) => item.id === editingProduct)
 
   return (
     <AppShell>
-      <SectionTitle eyebrow="Inventario" title="Productos y variantes" />
+      <SectionTitle eyebrow="Inventario" title="Productos" />
       <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
         <div className="space-y-5">
           <Card>
             <h2 className="mb-4 font-semibold">{editingProduct ? 'Editar producto' : 'Crear producto'}</h2>
             <form key={editingProduct ?? 'new'} className="space-y-4" onSubmit={submit}>
-              <Field label="Nombre" name="name" required defaultValue={products.data?.find((item) => item.id === editingProduct)?.name ?? ''} />
-              <Field label="SKU base" name="sku_base" required defaultValue={products.data?.find((item) => item.id === editingProduct)?.sku_base ?? ''} />
-              <Field label="Descripción" name="description" defaultValue={products.data?.find((item) => item.id === editingProduct)?.description ?? ''} />
+              <Field label="Código" name="code" required defaultValue={editing?.code ?? ''} />
+              <Field label="Nombre" name="name" required defaultValue={editing?.name ?? ''} />
               <div className="grid gap-3 sm:grid-cols-2">
-                <SelectField label="Categoría" name="category_id" required defaultValue={products.data?.find((item) => item.id === editingProduct)?.category?.id ?? ''}>
+                <SelectField label="Categoría" name="category_id" required defaultValue={editing?.category?.id ?? ''}>
                   <option value="">Seleccionar</option>
                   {(categories.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </SelectField>
-                <SelectField label="Unidad" name="unit_id" required defaultValue={products.data?.find((item) => item.id === editingProduct)?.unit?.id ?? ''}>
+                <SelectField label="Unidad de medida" name="unit_id" required defaultValue={editing?.unit?.id ?? ''}>
                   <option value="">Seleccionar</option>
                   {(units.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </SelectField>
               </div>
-              <Field label="Stock mínimo" name="min_stock" type="number" required defaultValue={products.data?.find((item) => item.id === editingProduct)?.min_stock ?? 0} />
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-medium">Variantes</h3>
-                  <button
-                    className="inline-flex h-10 items-center gap-2 rounded-md border border-[#c9c5b8] px-3 text-sm font-medium"
-                    type="button"
-                    onClick={() => setVariants((current) => [...current, { sku: '', price_with_tax: current[0]?.price_with_tax ?? '' }])}
-                  >
-                    <PlusCircle className="size-4" /> Variante
-                  </button>
-                </div>
-                {variants.map((variant, index) => (
-                  <div key={index} className="grid gap-2 rounded-md border border-[#e8e3d4] bg-white p-3 sm:grid-cols-[1fr_120px_44px]">
-                    <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="SKU variante" value={variant.sku} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, sku: event.target.value } : item))} />
-                    <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="USD" type="number" value={variant.price_with_tax} onChange={(event) => setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, price_with_tax: event.target.value } : item))} />
-                    <button className="grid size-11 place-items-center rounded-md border border-[#d69a8a] text-[#8a2d1b]" type="button" onClick={() => setVariants((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4" /></button>
-                  </div>
-                ))}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Precio unitario (USD)" name="price" type="number" required defaultValue={editing?.price ?? '0'} />
+                <Field label="Cantidad" name="quantity" type="number" required defaultValue={editing?.quantity ?? '0'} onChange={(e) => !editingProduct && setInitialQty(Number(e.target.value))} />
               </div>
-              <ErrorText error={create.error ?? updateProduct.error} />
+              {!editingProduct && initialQty > 0 ? (
+                <SelectField label="Proveedor (stock inicial)" name="supplier_id">
+                  <option value="">Sin proveedor</option>
+                  {(suppliersForCreate.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </SelectField>
+              ) : null}
+              <Field label="Referencia" name="reference" defaultValue={editing?.reference ?? ''} />
+              <div>
+                <span className="mb-1 block text-sm font-medium text-[#3d443b]">Imagen del producto</span>
+                <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-[#c9c5b8] bg-[#f8f6ef] px-4 py-5 text-center hover:border-[#16372f] hover:bg-[#edf4ef]">
+                  {imageFile ? (
+                    <img src={URL.createObjectURL(imageFile)} alt="Vista previa" className="h-24 w-24 rounded-md border border-[#e8e3d4] object-cover" />
+                  ) : editing?.image_url ? (
+                    <img src={editing.image_url} alt="Imagen actual" className="h-24 w-24 rounded-md border border-[#e8e3d4] object-cover" />
+                  ) : (
+                    <ImageIcon className="size-10 text-[#c9c5b8]" />
+                  )}
+                  <span className="text-sm text-[#687168]">
+                    {imageFile ? imageFile.name : editing?.image_url ? 'Clic para cambiar la imagen' : 'Clic para subir una imagen'}
+                  </span>
+                  <span className="text-xs text-[#9a9690]">PNG, JPG, WEBP · máx. 5 MB</span>
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
+              <ErrorText error={saveMutation.error} />
               <div className="flex flex-wrap gap-2">
                 <SubmitButton label={editingProduct ? 'Actualizar producto' : 'Crear producto'} icon={<PackagePlus className="size-4" />} />
-                {editingProduct ? <button className="h-11 rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => { setEditingProduct(null); setVariants([{ sku: '', price_with_tax: '' }]) }}>Cancelar</button> : null}
+                {editingProduct ? <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={cancelEdit}>Cancelar</button> : null}
               </div>
             </form>
           </Card>
           <Card>
             <h2 className="mb-4 font-semibold">Importar productos</h2>
             <div className="mb-4 flex flex-wrap gap-2">
-              <button className="inline-flex h-10 items-center gap-2 rounded-md border border-[#c9c5b8] px-3 text-sm font-medium" type="button" onClick={() => void downloadTemplate('csv')}><ArrowDownToLine className="size-4" /> CSV</button>
-              <button className="inline-flex h-10 items-center gap-2 rounded-md border border-[#c9c5b8] px-3 text-sm font-medium" type="button" onClick={() => void downloadTemplate('xlsx')}><FileSpreadsheet className="size-4" /> Excel</button>
+              <button className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-[#c9c5b8] px-3 text-sm font-medium" type="button" onClick={() => void downloadTemplate('csv')}><ArrowDownToLine className="size-4" /> CSV</button>
+              <button className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-[#c9c5b8] px-3 text-sm font-medium" type="button" onClick={() => void downloadTemplate('xlsx')}><FileSpreadsheet className="size-4" /> Excel</button>
             </div>
             <form className="space-y-4" onSubmit={previewUpload}>
               <input className="block w-full text-sm" name="file" type="file" accept=".csv,.xlsx" required />
@@ -429,59 +705,65 @@ export function ProductsPage() {
                 <div className="max-h-56 overflow-auto rounded-md border border-[#e8e3d4] bg-white">
                   {preview.rows.map((row) => (
                     <div key={row.row} className="border-b border-[#e8e3d4] p-3 text-sm last:border-0">
-                      <p className="font-medium">Fila {row.row}: {row.data.product_name} · {row.data.variant_sku}</p>
+                      <p className="font-medium">Fila {row.row}: {row.data.name} · {row.data.code}</p>
                       {row.errors.length > 0 ? <p className="mt-1 text-[#8a2d1b]">{row.errors.join(' ')}</p> : <p className="mt-1 text-[#276143]">Lista para importar</p>}
                     </div>
                   ))}
                 </div>
-                <button className="h-11 rounded-md bg-[#16372f] px-4 font-semibold text-white disabled:opacity-50" type="button" disabled={preview.errors_count > 0 || !importFile} onClick={() => importFile && importMutation.mutate(importFile)}>Confirmar importación</button>
+                <button className="h-11 cursor-pointer rounded-md bg-[#16372f] px-4 font-semibold text-white disabled:opacity-50" type="button" disabled={preview.errors_count > 0 || !importFile} onClick={() => importFile && importMutation.mutate(importFile)}>Confirmar importación</button>
               </div>
             ) : null}
           </Card>
         </div>
         <Card>
-          <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_auto]">
-            <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="Buscar producto o SKU" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px]">
+            <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="Buscar por nombre o código" value={search} onChange={(event) => setSearch(event.target.value)} />
             <select className="h-11 rounded-md border border-[#c9c5b8] px-3" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-              <option value="">Todas</option>
+              <option value="">Todas las categorías</option>
               {(categories.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
-            <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input checked={belowMin} type="checkbox" onChange={(event) => setBelowMin(event.target.checked)} /> Bajo mínimo</label>
           </div>
           <div className="grid gap-3">
             {(products.data ?? []).map((product) => (
               <article key={product.id} className="rounded-md border border-[#e8e3d4] bg-white p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="font-semibold">{product.name}</h2>
-                    <p className="text-sm text-[#687168]">{product.sku_base} · {product.category?.name} · {product.unit?.name}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <StockBadge stock={product.total_stock} min={product.min_stock} />
-                    <ActionButton onClick={() => editProduct(product.id)}><Edit3 className="size-4" /> Editar</ActionButton>
-                    <ActionButton danger onClick={() => remove.mutate(`/products/${product.id}`)}><Trash2 className="size-4" /> Eliminar</ActionButton>
-                  </div>
-                </div>
-                <div className="mt-3 grid gap-2">
-                  {product.variants.map((variant) => (
-                    <div key={variant.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-[#f8f6ef] px-3 py-2 text-sm text-[#3d443b]">
-                      <span>{variant.sku} · <MoneyDisplay compact usd={variant.price_with_tax} /> · {variant.current_stock} unidades · {variant.status}</span>
+                <div className="flex flex-wrap items-start gap-3">
+                  {product.image_url ? (
+                    <img src={product.image_url} alt={product.name} className="size-16 shrink-0 rounded-md border border-[#e8e3d4] object-cover" />
+                  ) : (
+                    <div className="grid size-16 shrink-0 place-items-center rounded-md border border-[#e8e3d4] bg-[#f8f6ef] text-[#687168]">
+                      <ImageIcon className="size-6" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <h2 className="font-semibold">{product.name}</h2>
+                        <p className="text-sm text-[#687168]">
+                          Código: {product.code} · {product.category?.name} · {product.unit?.name}
+                        </p>
+                        {product.reference ? <p className="text-sm text-[#687168]">Ref: {product.reference}</p> : null}
+                      </div>
                       <div className="flex flex-wrap gap-2">
-                        <ActionButton onClick={() => {
-                          const nextPrice = window.prompt('Nuevo precio USD', String(variant.price_with_tax))
-                          if (nextPrice) updateVariant.mutate({ path: `/products/variants/${variant.id}`, input: { price_with_tax: Number(nextPrice) } })
-                        }}><Edit3 className="size-4" /> Precio</ActionButton>
-                        <ActionButton onClick={() => updateVariant.mutate({ path: `/products/variants/${variant.id}`, input: { status: variant.status === 'active' ? 'inactive' : 'active' } })}>{variant.status === 'active' ? 'Inactivar' : 'Activar'}</ActionButton>
-                        <ActionButton danger onClick={() => remove.mutate(`/products/variants/${variant.id}`)}><Trash2 className="size-4" /> Eliminar</ActionButton>
+                        <ActionButton onClick={() => setViewingProduct(product)}>Ver más</ActionButton>
+                        <ActionButton onClick={() => startEdit(product)}><Edit3 className="size-4" /> Editar</ActionButton>
+                        <ActionButton danger onClick={() => remove.mutate(`/products/${product.id}`)}><Trash2 className="size-4" /> Eliminar</ActionButton>
                       </div>
                     </div>
-                  ))}
+                    <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                      <span className="rounded-md bg-[#edf4ef] px-2 py-1 font-semibold text-[#16372f]">
+                        <MoneyDisplay compact usd={product.price} rate={todayRate} />
+                      </span>
+                      <StockBadge stock={product.quantity} />
+                      {product.created_at ? <span className="text-[#687168]">Alta: {new Date(product.created_at).toLocaleDateString('es-ES')}</span> : null}
+                    </div>
+                  </div>
                 </div>
               </article>
             ))}
           </div>
         </Card>
       </div>
+      {viewingProduct && <ProductDetailModal product={viewingProduct} onClose={() => setViewingProduct(null)} />}
     </AppShell>
   )
 }
@@ -504,13 +786,19 @@ export function MovementsPage() {
   const [supplierId, setSupplierId] = useState('')
   const [reason, setReason] = useState('')
   const [adjustmentSubtype, setAdjustmentSubtype] = useState('merma')
-  const [lines, setLines] = useState<Array<{ variant_id: number | ''; quantity: string; unit_price_with_tax_usd: string }>>([{ variant_id: '', quantity: '1', unit_price_with_tax_usd: '' }])
+  const [lines, setLines] = useState<Array<{ product_id: number | ''; quantity: string; unit_price_with_tax_usd: string }>>([{ product_id: '', quantity: '1', unit_price_with_tax_usd: '' }])
   const [voiding, setVoiding] = useState<Movement | null>(null)
+  const [viewingMovement, setViewingMovement] = useState<Movement | null>(null)
   const [voidReason, setVoidReason] = useState('')
-  const variantsById = useMemo(() => new Map((products.data ?? []).flatMap((product) => product.variants.map((variant) => [variant.id, { ...variant, product }]))), [products.data])
+  const rateQuery = useQuery({
+    queryKey: ['rate-today'],
+    queryFn: async () => (await apiClient.get('/exchange-rate/today')).data as { exists: boolean; rate?: { usd_to_cup: string } },
+  })
+  const todayRate = Number(rateQuery.data?.rate?.usd_to_cup ?? 1)
+  const productsById = useMemo(() => new Map((products.data ?? []).map((product) => [product.id, product])), [products.data])
   const totalUsd = lines.reduce((sum, line) => {
-    const variant = typeof line.variant_id === 'number' ? variantsById.get(line.variant_id) : undefined
-    const price = type === 'entrada' && line.unit_price_with_tax_usd ? Number(line.unit_price_with_tax_usd) : Number(variant?.price_with_tax ?? 0)
+    const product = typeof line.product_id === 'number' ? productsById.get(line.product_id) : undefined
+    const price = type === 'entrada' && line.unit_price_with_tax_usd ? Number(line.unit_price_with_tax_usd) : Number(product?.price ?? 0)
     return sum + price * Number(line.quantity || 0)
   }, 0)
   const voidMutation = useMutation({
@@ -529,21 +817,21 @@ export function MovementsPage() {
     event.preventDefault()
     const payload: Record<string, unknown> = {
       items: lines
-        .filter((line) => line.variant_id !== '' && Number(line.quantity) !== 0)
+        .filter((line) => line.product_id !== '' && Number(line.quantity) !== 0)
         .map((line) => ({
-          variant_id: line.variant_id,
+          product_id: line.product_id,
           quantity: numberOrZero(line.quantity),
           unit_price_with_tax_usd: line.unit_price_with_tax_usd ? numberOrZero(line.unit_price_with_tax_usd) : undefined,
         })),
     }
-    if (type === 'entrada') payload.supplier_id = numberOrZero(supplierId)
+    if (type === 'entrada') payload.supplier_id = supplierId ? numberOrZero(supplierId) : null
     if (type === 'salida') payload.reason = reason
     if (type === 'ajuste') {
       payload.reason = reason
       payload.adjustment_subtype = adjustmentSubtype
     }
     create.mutate({ path: `/movements/${type}`, input: payload })
-    setLines([{ variant_id: '', quantity: '1', unit_price_with_tax_usd: '' }])
+    setLines([{ product_id: '', quantity: '1', unit_price_with_tax_usd: '' }])
     setReason('')
   }
 
@@ -555,28 +843,28 @@ export function MovementsPage() {
           <form className="space-y-4" onSubmit={submit}>
             <div className="grid grid-cols-4 gap-2">
               {['venta', 'entrada', 'salida', 'ajuste'].map((item) => (
-                <button key={item} className={`h-10 rounded-md border text-sm capitalize ${type === item ? 'border-[#16372f] bg-[#16372f] text-white' : 'border-[#c9c5b8]'}`} type="button" onClick={() => setType(item)}>{item}</button>
+                <button key={item} className={`h-10 cursor-pointer rounded-md border text-sm capitalize ${type === item ? 'border-[#16372f] bg-[#16372f] text-white' : 'border-[#c9c5b8]'}`} type="button" onClick={() => setType(item)}>{item}</button>
               ))}
             </div>
             <div className="space-y-3">
               {lines.map((line, index) => {
-                const selected = typeof line.variant_id === 'number' ? variantsById.get(line.variant_id) : undefined
+                const selected = typeof line.product_id === 'number' ? productsById.get(line.product_id) : undefined
                 return (
                   <div key={index} className="rounded-md border border-[#e8e3d4] bg-white p-3">
-                    <VariantPicker products={products.data ?? []} value={line.variant_id} onChange={(value) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, variant_id: value } : item))} />
+                    <VariantPicker products={products.data ?? []} value={line.product_id} onChange={(value) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, product_id: value } : item))} />
                     <div className="mt-3 grid gap-2 sm:grid-cols-[100px_1fr_44px]">
                       <input className="h-11 rounded-md border border-[#c9c5b8] px-3" type="number" value={line.quantity} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: event.target.value } : item))} />
-                      {type === 'entrada' ? <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="Precio compra USD" type="number" value={line.unit_price_with_tax_usd} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, unit_price_with_tax_usd: event.target.value } : item))} /> : <p className="flex min-h-11 items-center text-sm text-[#687168]">{selected ? <MoneyDisplay compact usd={selected.price_with_tax} /> : 'Sin variante'}</p>}
-                      <button className="grid size-11 place-items-center rounded-md border border-[#d69a8a] text-[#8a2d1b]" type="button" onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4" /></button>
+                      {type === 'entrada' ? <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="Precio compra USD" type="number" value={line.unit_price_with_tax_usd} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, unit_price_with_tax_usd: event.target.value } : item))} /> : <p className="flex min-h-11 items-center text-sm text-[#687168]">{selected ? <MoneyDisplay compact usd={selected.price} rate={todayRate} /> : 'Sin producto'}</p>}
+                      <button className="grid size-11 cursor-pointer place-items-center rounded-md border border-[#d69a8a] text-[#8a2d1b]" type="button" onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4" /></button>
                     </div>
                   </div>
                 )
               })}
-              <button className="h-11 rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setLines((current) => [...current, { variant_id: '', quantity: '1', unit_price_with_tax_usd: '' }])}>Agregar línea</button>
+              <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setLines((current) => [...current, { product_id: '', quantity: '1', unit_price_with_tax_usd: '' }])}>Agregar línea</button>
             </div>
             {type === 'entrada' ? (
-              <SelectField label="Proveedor" name="supplier_id" required value={supplierId} onChange={setSupplierId}>
-                <option value="">Seleccionar</option>
+              <SelectField label="Proveedor" name="supplier_id" value={supplierId} onChange={setSupplierId}>
+                <option value="">Sin proveedor</option>
                 {(suppliers.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </SelectField>
             ) : null}
@@ -594,7 +882,7 @@ export function MovementsPage() {
               </SelectField>
             ) : null}
             <div className="rounded-md bg-[#edf4ef] px-3 py-2 text-sm">
-              Total estimado: <MoneyDisplay usd={totalUsd} />
+              Total estimado: <MoneyDisplay usd={totalUsd} rate={todayRate} />
             </div>
             <ErrorText error={create.error} />
             <SubmitButton label="Registrar" icon={<RefreshCw className="size-4" />} />
@@ -621,12 +909,16 @@ export function MovementsPage() {
                   <MoneyDisplay usd={movement.totals.with_tax_usd} cup={movement.totals.with_tax_cup} rate={movement.exchange_rate_snapshot} />
                 </div>
                 <p className="mt-1 text-sm text-[#687168]">{movement.status} · ratio {movement.exchange_rate_snapshot} · impuesto {movement.tax_rate_snapshot}%</p>
-                <p className="mt-2 text-sm text-[#3d443b]">{movement.items.map((item) => `${item.sku} x ${item.quantity}`).join(', ')}</p>
-                {movement.status === 'activo' && movement.type !== 'anulacion' ? (
-                  <div className="mt-3">
-                    <ActionButton danger onClick={() => setVoiding(movement)}><XCircle className="size-4" /> Anular</ActionButton>
+                <p className="mt-2 text-sm text-[#3d443b]">{movement.items.map((item) => `${item.product_name} x ${item.quantity}`).join(', ')}</p>
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <ActionButton onClick={() => setViewingMovement(movement)}>Ver más</ActionButton>
+                    {movement.status === 'activo' && movement.type !== 'anulacion' ? (
+                      <ActionButton danger onClick={() => setVoiding(movement)}><XCircle className="size-4" /> Anular</ActionButton>
+                    ) : null}
                   </div>
-                ) : null}
+                  <p className="text-sm text-[#687168]">{new Date(movement.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}</p>
+                </div>
               </article>
             ))}
           </div>
@@ -642,6 +934,7 @@ export function MovementsPage() {
         onCancel={() => setVoiding(null)}
         onConfirm={() => voiding && voidMutation.mutate({ id: voiding.id, reason_void: voidReason })}
       />
+      {viewingMovement && <MovementDetailModal movement={viewingMovement} onClose={() => setViewingMovement(null)} />}
     </AppShell>
   )
 }
@@ -654,6 +947,14 @@ export function SettingsPage() {
     queryFn: async () => (await apiClient.get('/settings/business')).data.data as Record<string, string>,
   })
   const businessUpdate = usePut<Record<string, string>>(['business-settings'])
+  const currentRate = useQuery({
+    queryKey: ['rate-today'],
+    queryFn: async () => (await apiClient.get('/exchange-rate/today')).data as { exists: boolean; rate?: { usd_to_cup: string } },
+  })
+  const currentTax = useQuery({
+    queryKey: ['tax-rate'],
+    queryFn: async () => (await apiClient.get('/settings/tax-rate')).data as { value: string },
+  })
 
   function saveRate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -677,15 +978,18 @@ export function SettingsPage() {
       <SectionTitle eyebrow="Configuración" title="Ratio, impuesto y negocio" />
       <div className="grid gap-5 md:grid-cols-2">
         <Card>
-          <form className="space-y-4" onSubmit={saveRate}>
-            <Field label="Ratio USD/CUP de hoy" name="usd_to_cup" type="number" required />
+          <form key={currentRate.data?.rate?.usd_to_cup ?? 'rate'} className="space-y-4" onSubmit={saveRate}>
+            <Field label="Ratio USD/CUP de hoy" name="usd_to_cup" type="number" required defaultValue={currentRate.data?.rate?.usd_to_cup ?? ''} />
+            {!currentRate.data?.exists && currentRate.data?.rate && (
+              <p className="text-xs text-[#6d5312]">* Mostrando último ratio guardado. Guarda uno nuevo para hoy.</p>
+            )}
             <ErrorText error={rate.error} />
             <SubmitButton label="Guardar ratio" icon={<BadgeDollarSign className="size-4" />} />
           </form>
         </Card>
         <Card>
-          <form className="space-y-4" onSubmit={saveTax}>
-            <Field label="Tasa de impuesto (%)" name="value" type="number" required />
+          <form key={currentTax.data?.value ?? 'tax'} className="space-y-4" onSubmit={saveTax}>
+            <Field label="Tasa de impuesto (%)" name="value" type="number" required defaultValue={currentTax.data?.value ?? ''} />
             <ErrorText error={tax.error} />
             <SubmitButton label="Guardar impuesto" />
           </form>
@@ -735,15 +1039,15 @@ export function ReportsPage() {
           </div>
         </Card>
         <Card>
-          <h2 className="mb-3 font-semibold">Productos bajo mínimo</h2>
+          <h2 className="mb-3 font-semibold">Productos sin stock</h2>
           <div className="space-y-2">
             {(lowStock.data ?? []).map((item) => (
-              <p key={String(item.id)} className="rounded-md bg-white px-3 py-2 text-sm">{String(item.name)} · stock {String(item.total_stock)} / mínimo {String(item.min_stock)}</p>
+              <p key={String(item.id)} className="rounded-md bg-white px-3 py-2 text-sm">{String(item.name)} · cód. {String(item.code)} · cantidad: {String(item.quantity)}</p>
             ))}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <ActionButton onClick={() => void downloadReport('/reports/low-stock?format=xlsx', 'productos_bajo_minimo.xlsx')}><FileSpreadsheet className="size-4" /> Excel</ActionButton>
-            <ActionButton onClick={() => void downloadReport('/reports/low-stock?format=pdf', 'productos_bajo_minimo.pdf')}><FileText className="size-4" /> PDF</ActionButton>
+            <ActionButton onClick={() => void downloadReport('/reports/low-stock?format=xlsx', 'productos_sin_stock.xlsx')}><FileSpreadsheet className="size-4" /> Excel</ActionButton>
+            <ActionButton onClick={() => void downloadReport('/reports/low-stock?format=pdf', 'productos_sin_stock.pdf')}><FileText className="size-4" /> PDF</ActionButton>
           </div>
         </Card>
       </div>
@@ -789,7 +1093,7 @@ export function UsersPage() {
             <ErrorText error={create.error ?? update.error} />
             <div className="flex flex-wrap gap-2">
               <SubmitButton label={editing ? 'Actualizar usuario' : 'Crear usuario'} icon={<Users className="size-4" />} />
-              {editing ? <button className="h-11 rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setEditing(null)}>Cancelar</button> : null}
+              {editing ? <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setEditing(null)}>Cancelar</button> : null}
             </div>
           </form>
         </Card>

@@ -8,26 +8,18 @@ export interface OptionItem {
   abbreviation?: string
 }
 
-export interface Variant {
-  id: number
-  product_id: number
-  sku: string
-  price_with_tax: string
-  current_stock: number
-  status: string
-}
-
 export interface Product {
   id: number
+  code: string
   name: string
-  description?: string
-  sku_base: string
-  min_stock: number
+  price: string
+  reference?: string
+  quantity: number
+  image_url?: string
   status: string
-  total_stock: number
+  created_at?: string
   category?: OptionItem
   unit?: OptionItem
-  variants: Variant[]
 }
 
 export interface ImportPreviewRow {
@@ -43,16 +35,59 @@ export interface ImportPreview {
   rows: ImportPreviewRow[]
 }
 
+export interface MovementUser {
+  id: number
+  name: string
+  email: string
+}
+
+export interface MovementItem {
+  id?: number
+  product_id?: number
+  code: string
+  product_name: string
+  quantity: number
+  unit_price_with_tax_usd?: string
+  subtotal_with_tax_usd?: string
+  subtotal_with_tax_cup?: string
+}
+
+export interface ProductHistoryEntry {
+  id: number
+  code: string
+  type: string
+  status: string
+  quantity: number
+  created_at: string
+  created_by?: string | null
+  supplier?: string | null
+  reason?: string | null
+}
+
 export interface Movement {
   id: number
   type: string
+  adjustment_subtype?: string | null
   code: string
   status: string
   created_at: string
   exchange_rate_snapshot: string
   tax_rate_snapshot: string
-  totals: { with_tax_usd: string; with_tax_cup: string }
-  items: Array<{ sku: string; product_name: string; quantity: number }>
+  reason?: string | null
+  reason_void?: string | null
+  supplier?: { id: number; name: string } | null
+  created_by?: MovementUser | null
+  voided_by?: MovementUser | null
+  voided_at?: string | null
+  totals: {
+    without_tax_usd: string
+    tax_usd: string
+    with_tax_usd: string
+    without_tax_cup: string
+    tax_cup: string
+    with_tax_cup: string
+  }
+  items: MovementItem[]
 }
 
 export function useList<T>(key: string, path: string) {

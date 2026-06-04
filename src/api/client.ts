@@ -8,13 +8,16 @@ import { authStorage } from '@/lib/auth-storage'
 
 export const apiClient = axios.create({
   baseURL: env.apiBaseUrl,
-  headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  headers: { Accept: 'application/json' },
 })
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = authStorage.getToken()
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`)
+  }
+  if (!(config.data instanceof FormData)) {
+    config.headers.set('Content-Type', 'application/json')
   }
   return config
 })
