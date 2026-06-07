@@ -37,7 +37,7 @@ export function ConfirmDestructiveModal({
           <label className="mt-4 block">
             <span className="mb-1 block text-sm font-medium">Motivo</span>
             <textarea
-              className="min-h-24 w-full rounded-md border border-[#c9c5b8] bg-white p-3 outline-none focus:border-[#1d4ed8] focus:ring-4 focus:ring-[#1d4ed8]/12"
+              className="min-h-24 w-full rounded-md border border-[#c9c5b8] bg-white p-3 outline-none focus:border-[#16372f] focus:ring-4 focus:ring-[#16372f]/12"
               value={reason}
               onChange={(event) => onReasonChange?.(event.target.value)}
             />

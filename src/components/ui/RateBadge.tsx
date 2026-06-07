@@ -30,7 +30,7 @@ export function RateBadge() {
   return (
     <div className="relative">
       <button
-        className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-semibold ${isToday ? 'border-[#bad6c7] bg-[#edf4ef] text-[#1d4ed8]' : 'border-[#dfb84b] bg-[#fff7d7] text-[#6d5312]'}`}
+        className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-semibold ${isToday ? 'border-[#bad6c7] bg-[#edf4ef] text-[#16372f]' : 'border-[#dfb84b] bg-[#fff7d7] text-[#6d5312]'}`}
         type="button"
         onClick={() => setOpen((current) => !current)}
       >
@@ -56,7 +56,7 @@ export function RateBadge() {
             required
             defaultValue={currentValue ?? ''}
           />
-          <button className="mt-3 h-10 w-full cursor-pointer rounded-md bg-[#1d4ed8] font-semibold text-white" type="submit">Guardar</button>
+          <button className="mt-3 h-10 w-full cursor-pointer rounded-md bg-[#16372f] font-semibold text-white" type="submit">Guardar</button>
         </form>
       ) : null}
     </div>

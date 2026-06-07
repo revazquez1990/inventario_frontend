@@ -30,7 +30,7 @@ export function DashboardPage() {
             <article key={metric.label} className="rounded-md border border-[#d8d2c2] bg-[#fbfaf5] p-5">
               <div className="mb-5 flex items-center justify-between">
                 <p className="text-sm font-medium text-[#687168]">{metric.label}</p>
-                <Icon className="size-5 text-[#1d4ed8]" />
+                <Icon className="size-5 text-[#16372f]" />
               </div>
               <p className="text-3xl font-semibold">{metric.value}</p>
             </article>

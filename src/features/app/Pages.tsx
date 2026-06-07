@@ -60,7 +60,7 @@ function Field({ label, name, type = 'text', required = false, defaultValue = ''
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-[#3d443b]">{label}</span>
       <input
-        className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3 text-base outline-none focus:border-[#1d4ed8] focus:ring-4 focus:ring-[#1d4ed8]/12"
+        className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3 text-base outline-none focus:border-[#16372f] focus:ring-4 focus:ring-[#16372f]/12"
         name={name}
         type={type}
         required={required}
@@ -76,7 +76,7 @@ function SelectField({ label, name, children, required = false, value, onChange,
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-[#3d443b]">{label}</span>
       <select
-        className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3 text-base outline-none focus:border-[#1d4ed8] focus:ring-4 focus:ring-[#1d4ed8]/12"
+        className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3 text-base outline-none focus:border-[#16372f] focus:ring-4 focus:ring-[#16372f]/12"
         name={name}
         required={required}
         value={value}
@@ -96,7 +96,7 @@ function ErrorText({ error }: { error: unknown }) {
 
 function SubmitButton({ label, icon = <Save className="size-4" /> }: { label: string; icon?: React.ReactNode }) {
   return (
-    <button className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md bg-[#1d4ed8] px-4 font-semibold text-white hover:bg-[#0f2b25]" type="submit">
+    <button className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md bg-[#16372f] px-4 font-semibold text-white hover:bg-[#0f2b25]" type="submit">
       {icon}
       {label}
     </button>
@@ -182,7 +182,7 @@ function Accordion({ title, children }: { title: string; children: React.ReactNo
     <div className="border-t border-[#e8e3d4] pt-4">
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center justify-between rounded-md py-1 text-sm font-semibold text-[#3d443b] hover:text-[#1d4ed8]"
+        className="flex w-full cursor-pointer items-center justify-between rounded-md py-1 text-sm font-semibold text-[#3d443b] hover:text-[#16372f]"
         onClick={() => setOpen((v) => !v)}
       >
         <span>{title}</span>
@@ -207,7 +207,7 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
   })
 
   const typeColor: Record<string, string> = {
-    entrada: 'bg-[#edf4ef] text-[#1d4ed8]',
+    entrada: 'bg-[#edf4ef] text-[#16372f]',
     salida: 'bg-[#fff1ea] text-[#8a2d1b]',
     venta: 'bg-[#fff1ea] text-[#8a2d1b]',
     ajuste: 'bg-[#f0f0f0] text-[#3d443b]',
@@ -248,7 +248,7 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
           {!historyEnabled && (
             <button
               type="button"
-              className="cursor-pointer text-sm text-[#1d4ed8] underline"
+              className="cursor-pointer text-sm text-[#16372f] underline"
               onClick={() => setHistoryEnabled(true)}
             >
               Cargar historial
@@ -291,7 +291,7 @@ function MovementDetailModal({ movement, onClose }: { movement: Movement; onClos
 
   const typeLabel: Record<string, string> = { entrada: 'Entrada', salida: 'Salida', venta: 'Venta', ajuste: 'Ajuste', anulacion: 'Anulación' }
   const typeColor: Record<string, string> = {
-    entrada: 'bg-[#edf4ef] text-[#1d4ed8]',
+    entrada: 'bg-[#edf4ef] text-[#16372f]',
     salida: 'bg-[#fff1ea] text-[#8a2d1b]',
     venta: 'bg-[#fff1ea] text-[#8a2d1b]',
     ajuste: 'bg-[#f0f0f0] text-[#3d443b]',
@@ -308,7 +308,7 @@ function MovementDetailModal({ movement, onClose }: { movement: Movement; onClos
           <div className="flex flex-wrap gap-2">
             <span className={`rounded-md px-2.5 py-1 text-xs font-semibold capitalize ${typeColor[m.type] ?? ''}`}>{typeLabel[m.type] ?? m.type}</span>
             {m.adjustment_subtype && <span className="rounded-md bg-[#f0f0f0] px-2.5 py-1 text-xs font-medium capitalize">{m.adjustment_subtype}</span>}
-            <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${m.status === 'anulado' ? 'bg-[#fff1ea] text-[#8a2d1b]' : 'bg-[#edf4ef] text-[#1d4ed8]'}`}>{m.status}</span>
+            <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${m.status === 'anulado' ? 'bg-[#fff1ea] text-[#8a2d1b]' : 'bg-[#edf4ef] text-[#16372f]'}`}>{m.status}</span>
           </div>
 
           {/* totals */}
@@ -661,7 +661,7 @@ export function ProductsPage() {
               <Field label="Referencia" name="reference" defaultValue={editing?.reference ?? ''} />
               <div>
                 <span className="mb-1 block text-sm font-medium text-[#3d443b]">Imagen del producto</span>
-                <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-[#c9c5b8] bg-[#f8f6ef] px-4 py-5 text-center hover:border-[#1d4ed8] hover:bg-[#edf4ef]">
+                <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-[#c9c5b8] bg-[#f8f6ef] px-4 py-5 text-center hover:border-[#16372f] hover:bg-[#edf4ef]">
                   {imageFile ? (
                     <img src={URL.createObjectURL(imageFile)} alt="Vista previa" className="h-24 w-24 rounded-md border border-[#e8e3d4] object-cover" />
                   ) : editing?.image_url ? (
@@ -710,7 +710,7 @@ export function ProductsPage() {
                     </div>
                   ))}
                 </div>
-                <button className="h-11 cursor-pointer rounded-md bg-[#1d4ed8] px-4 font-semibold text-white disabled:opacity-50" type="button" disabled={preview.errors_count > 0 || !importFile} onClick={() => importFile && importMutation.mutate(importFile)}>Confirmar importación</button>
+                <button className="h-11 cursor-pointer rounded-md bg-[#16372f] px-4 font-semibold text-white disabled:opacity-50" type="button" disabled={preview.errors_count > 0 || !importFile} onClick={() => importFile && importMutation.mutate(importFile)}>Confirmar importación</button>
               </div>
             ) : null}
           </Card>
@@ -750,7 +750,7 @@ export function ProductsPage() {
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-3 text-sm">
-                      <span className="rounded-md bg-[#edf4ef] px-2 py-1 font-semibold text-[#1d4ed8]">
+                      <span className="rounded-md bg-[#edf4ef] px-2 py-1 font-semibold text-[#16372f]">
                         <MoneyDisplay compact usd={product.price} rate={todayRate} />
                       </span>
                       <StockBadge stock={product.quantity} />
@@ -843,7 +843,7 @@ export function MovementsPage() {
           <form className="space-y-4" onSubmit={submit}>
             <div className="grid grid-cols-4 gap-2">
               {['venta', 'entrada', 'salida', 'ajuste'].map((item) => (
-                <button key={item} className={`h-10 cursor-pointer rounded-md border text-sm capitalize ${type === item ? 'border-[#1d4ed8] bg-[#1d4ed8] text-white' : 'border-[#c9c5b8]'}`} type="button" onClick={() => setType(item)}>{item}</button>
+                <button key={item} className={`h-10 cursor-pointer rounded-md border text-sm capitalize ${type === item ? 'border-[#16372f] bg-[#16372f] text-white' : 'border-[#c9c5b8]'}`} type="button" onClick={() => setType(item)}>{item}</button>
               ))}
             </div>
             <div className="space-y-3">
