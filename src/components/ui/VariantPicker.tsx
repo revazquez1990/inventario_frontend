@@ -61,7 +61,7 @@ export function VariantPicker({ products, value, onChange }: ProductPickerProps)
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#687168]" />
         <input
-          className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white pl-10 pr-9 outline-none focus:border-[#16372f] focus:ring-4 focus:ring-[#16372f]/12"
+          className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white pl-10 pr-9 outline-none focus:border-[#1d4ed8] focus:ring-4 focus:ring-[#1d4ed8]/12"
           placeholder="Buscar por nombre o código..."
           value={search}
           onChange={(e) => handleInputChange(e.target.value)}

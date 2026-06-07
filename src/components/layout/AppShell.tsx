@@ -47,7 +47,7 @@ export function AppShell({ children }: AppShellProps) {
             >
               <Menu className="size-5" />
             </button>
-            <div className="grid size-10 place-items-center rounded-md bg-[#16372f] text-white">
+            <div className="grid size-10 place-items-center rounded-md bg-[#1d4ed8] text-white">
               <PackageSearch className="size-5" />
             </div>
             <div>
@@ -94,7 +94,7 @@ export function AppShell({ children }: AppShellProps) {
                   <NavLink
                     key={item.to}
                     className={({ isActive }) =>
-                      `flex h-12 items-center gap-3 rounded-md px-3 text-sm font-medium ${isActive ? 'bg-[#16372f] text-white' : 'text-[#3d443b] hover:bg-[#eee9dc]'}`
+                      `flex h-12 items-center gap-3 rounded-md px-3 text-sm font-medium ${isActive ? 'bg-[#1d4ed8] text-white' : 'text-[#3d443b] hover:bg-[#eee9dc]'}`
                     }
                     to={item.to}
                     onClick={() => setDrawerOpen(false)}
@@ -118,7 +118,7 @@ export function AppShell({ children }: AppShellProps) {
                 <NavLink
                   key={item.to}
                   className={({ isActive }) =>
-                    `flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium ${isActive ? 'bg-[#16372f] text-white' : 'text-[#3d443b] hover:bg-[#eee9dc]'}`
+                    `flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium ${isActive ? 'bg-[#1d4ed8] text-white' : 'text-[#3d443b] hover:bg-[#eee9dc]'}`
                   }
                   to={item.to}
                 >

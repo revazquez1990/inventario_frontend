@@ -44,9 +44,9 @@ export function LoginPage() {
   return (
     <main className="min-h-full bg-[#f4f2ea] text-[#20231f]">
       <div className="grid min-h-screen lg:grid-cols-[minmax(380px,0.9fr)_1.1fr]">
-        <section className="flex min-h-[42vh] flex-col justify-between bg-[#16372f] p-6 text-white sm:p-10 lg:min-h-screen">
+        <section className="flex min-h-[42vh] flex-col justify-between bg-[#1d4ed8] p-6 text-white sm:p-10 lg:min-h-screen">
           <div className="flex items-center gap-3">
-            <div className="grid size-12 place-items-center rounded-lg bg-[#f2c94c] text-[#16372f] shadow-[0_8px_24px_rgba(0,0,0,0.24)]">
+            <div className="grid size-12 place-items-center rounded-lg bg-[#f2c94c] text-[#1d4ed8] shadow-[0_8px_24px_rgba(0,0,0,0.24)]">
               <Boxes className="size-7" strokeWidth={2.2} />
             </div>
             <div>
@@ -87,7 +87,7 @@ export function LoginPage() {
                 <span className="relative block">
                   <Mail className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[#6e776e]" />
                   <input
-                    className="h-14 w-full rounded-md border border-[#c9c5b8] bg-white pl-12 pr-4 text-base outline-none transition focus:border-[#16372f] focus:ring-4 focus:ring-[#16372f]/12"
+                    className="h-14 w-full rounded-md border border-[#c9c5b8] bg-white pl-12 pr-4 text-base outline-none transition focus:border-[#1d4ed8] focus:ring-4 focus:ring-[#1d4ed8]/12"
                     type="email"
                     autoComplete="email"
                     aria-invalid={Boolean(errors.email)}
@@ -104,14 +104,14 @@ export function LoginPage() {
                 <span className="relative block">
                   <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[#6e776e]" />
                   <input
-                    className="h-14 w-full rounded-md border border-[#c9c5b8] bg-white pl-12 pr-14 text-base outline-none transition focus:border-[#16372f] focus:ring-4 focus:ring-[#16372f]/12"
+                    className="h-14 w-full rounded-md border border-[#c9c5b8] bg-white pl-12 pr-14 text-base outline-none transition focus:border-[#1d4ed8] focus:ring-4 focus:ring-[#1d4ed8]/12"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     aria-invalid={Boolean(errors.password)}
                     {...register('password')}
                   />
                   <button
-                    className="absolute right-2 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-md text-[#3d443b] transition hover:bg-[#eee9dc] focus:outline-none focus:ring-3 focus:ring-[#16372f]/15"
+                    className="absolute right-2 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-md text-[#3d443b] transition hover:bg-[#eee9dc] focus:outline-none focus:ring-3 focus:ring-[#1d4ed8]/15"
                     type="button"
                     aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                     onClick={() => setShowPassword((current) => !current)}
@@ -132,7 +132,7 @@ export function LoginPage() {
               ) : null}
 
               <button
-                className="flex h-14 w-full items-center justify-center gap-3 rounded-md bg-[#16372f] px-5 text-base font-semibold text-white shadow-[0_10px_28px_rgba(22,55,47,0.22)] transition hover:bg-[#0f2b25] focus:outline-none focus:ring-4 focus:ring-[#16372f]/20 disabled:cursor-not-allowed disabled:bg-[#7b8883]"
+                className="flex h-14 w-full items-center justify-center gap-3 rounded-md bg-[#1d4ed8] px-5 text-base font-semibold text-white shadow-[0_10px_28px_rgba(22,55,47,0.22)] transition hover:bg-[#0f2b25] focus:outline-none focus:ring-4 focus:ring-[#1d4ed8]/20 disabled:cursor-not-allowed disabled:bg-[#7b8883]"
                 type="submit"
                 disabled={isSubmitting || loginMutation.isPending}
               >
