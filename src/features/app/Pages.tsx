@@ -564,6 +564,7 @@ export function ProductsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['products'] })
+      await queryClient.invalidateQueries({ queryKey: [`products${params}`] })
       await queryClient.invalidateQueries({ queryKey: ['movements'] })
       setImageFile(null)
       setEditingProduct(null)
