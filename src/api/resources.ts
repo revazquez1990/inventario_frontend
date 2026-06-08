@@ -8,6 +8,24 @@ export interface OptionItem {
   abbreviation?: string
 }
 
+export interface AttributeValueOption {
+  id: number
+  value: string
+  attribute_id?: number
+}
+
+export interface AttributeOption {
+  id: number
+  name: string
+  values: AttributeValueOption[]
+}
+
+export interface ProductAttributeValue {
+  id: number
+  value: string
+  attribute?: string
+}
+
 export interface Product {
   id: number
   code: string
@@ -20,6 +38,7 @@ export interface Product {
   created_at?: string
   category?: OptionItem
   unit?: OptionItem
+  attribute_values?: ProductAttributeValue[]
 }
 
 export interface ImportPreviewRow {
@@ -157,6 +176,10 @@ export function useUsers() {
 
 export function useProducts(params = '') {
   return useList<Product>(`products${params}`, `/products${params}`)
+}
+
+export function useAttributes() {
+  return useList<AttributeOption>('attributes', '/attributes')
 }
 
 export function useMovements(params = '?per_page=50') {

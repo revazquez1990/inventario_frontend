@@ -25,6 +25,7 @@ import {
   type OptionItem,
   type Product,
   type ProductHistoryEntry,
+  useAttributes,
   useDelete,
   useList,
   useMovements,
@@ -243,6 +244,19 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
             <dd><StockBadge stock={product.quantity} /></dd>
           </div>
         </dl>
+
+        {(product.attribute_values?.length ?? 0) > 0 ? (
+          <div>
+            <p className="mb-2 text-xs text-[#687168]">Variedad</p>
+            <div className="flex flex-wrap gap-2">
+              {(product.attribute_values ?? []).map((value) => (
+                <span key={value.id} className="rounded-full border border-[#e8e3d4] bg-[#f8f6ef] px-3 py-1 text-xs font-medium text-[#3d443b]">
+                  {value.attribute ? `${value.attribute}: ` : ''}{value.value}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <Accordion title="Historial de movimientos" >
           {!historyEnabled && (
@@ -520,6 +534,7 @@ export function ProductsPage() {
   const products = useProducts(params)
   const categories = useList<OptionItem>('categories', '/categories')
   const units = useList<OptionItem>('units', '/units')
+  const attributes = useAttributes()
   const queryClient = useQueryClient()
   const rateQuery = useQuery({
     queryKey: ['rate-today'],
@@ -532,6 +547,8 @@ export function ProductsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [initialQty, setInitialQty] = useState(0)
+  const [hasVariety, setHasVariety] = useState(false)
+  const [selectedValueIds, setSelectedValueIds] = useState<number[]>([])
   const suppliersForCreate = useList<OptionItem>('suppliers', '/suppliers')
   const [preview, setPreview] = useState<ImportPreview | null>(null)
 
@@ -600,10 +617,14 @@ export function ProductsPage() {
     formData.append('quantity', String(raw.get('quantity') ?? '0'))
     if (!editingProduct && initialQty > 0) formData.append('supplier_id', String(raw.get('supplier_id') ?? ''))
     if (imageFile) formData.append('image', imageFile)
+    formData.append('manage_variety', '1')
+    if (hasVariety) selectedValueIds.forEach((id) => formData.append('attribute_value_ids[]', String(id)))
     if (editingProduct) formData.append('_id', String(editingProduct))
     saveMutation.mutate(formData)
     event.currentTarget.reset()
     setImageFile(null)
+    setHasVariety(false)
+    setSelectedValueIds([])
   }
 
   function previewUpload(event: FormEvent<HTMLFormElement>) {
@@ -619,11 +640,20 @@ export function ProductsPage() {
     setEditingProduct(product.id)
     setImageFile(null)
     setInitialQty(0)
+    const valueIds = (product.attribute_values ?? []).map((value) => value.id)
+    setSelectedValueIds(valueIds)
+    setHasVariety(valueIds.length > 0)
   }
 
   function cancelEdit() {
     setEditingProduct(null)
     setImageFile(null)
+    setHasVariety(false)
+    setSelectedValueIds([])
+  }
+
+  function toggleValue(id: number) {
+    setSelectedValueIds((prev) => (prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]))
   }
 
   const editing = products.data?.find((item) => item.id === editingProduct)
@@ -659,6 +689,44 @@ export function ProductsPage() {
                 </SelectField>
               ) : null}
               <Field label="Referencia" name="reference" defaultValue={editing?.reference ?? ''} />
+              <div className="rounded-md border border-[#e8e3d4] bg-[#f8f6ef] p-3">
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[#3d443b]">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-[#16372f]"
+                    checked={hasVariety}
+                    onChange={(event) => setHasVariety(event.target.checked)}
+                  />
+                  ¿Este producto tiene variedad (atributos)?
+                </label>
+                {hasVariety ? (
+                  <div className="mt-3 space-y-3">
+                    {(attributes.data ?? []).length === 0 ? (
+                      <p className="text-xs text-[#687168]">No hay atributos creados. Créalos en la sección Atributos.</p>
+                    ) : null}
+                    {(attributes.data ?? []).map((attribute) => (
+                      <div key={attribute.id}>
+                        <p className="mb-1 text-xs font-medium text-[#687168]">{attribute.name}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {attribute.values.map((value) => {
+                            const active = selectedValueIds.includes(value.id)
+                            return (
+                              <button
+                                type="button"
+                                key={value.id}
+                                onClick={() => toggleValue(value.id)}
+                                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium ${active ? 'border-[#16372f] bg-[#16372f] text-white' : 'border-[#c9c5b8] bg-white text-[#3d443b] hover:border-[#16372f]'}`}
+                              >
+                                {value.value}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <div>
                 <span className="mb-1 block text-sm font-medium text-[#3d443b]">Imagen del producto</span>
                 <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-[#c9c5b8] bg-[#f8f6ef] px-4 py-5 text-center hover:border-[#16372f] hover:bg-[#edf4ef]">
