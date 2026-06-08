@@ -227,7 +227,6 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
             ['Categoría', product.category?.name ?? '—'],
             ['Unidad', product.unit?.name ?? '—'],
             ['Referencia', product.reference || '—'],
-            ['Variedad', product.variety || '—'],
             ['Fecha de alta', product.created_at ? new Date(product.created_at).toLocaleDateString('es-ES') : '—'],
           ] as [string, string][]).map(([label, value]) => (
             <div key={label}>
@@ -598,7 +597,6 @@ export function ProductsPage() {
     formData.append('unit_id', String(raw.get('unit_id') ?? ''))
     formData.append('price', String(raw.get('price') ?? ''))
     formData.append('reference', String(raw.get('reference') ?? ''))
-    formData.append('variety', String(raw.get('variety') ?? ''))
     formData.append('quantity', String(raw.get('quantity') ?? '0'))
     if (!editingProduct && initialQty > 0) formData.append('supplier_id', String(raw.get('supplier_id') ?? ''))
     if (imageFile) formData.append('image', imageFile)
@@ -661,7 +659,6 @@ export function ProductsPage() {
                 </SelectField>
               ) : null}
               <Field label="Referencia" name="reference" defaultValue={editing?.reference ?? ''} />
-              <Field label="Variedad" name="variety" defaultValue={editing?.variety ?? ''} />
               <div>
                 <span className="mb-1 block text-sm font-medium text-[#3d443b]">Imagen del producto</span>
                 <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-[#c9c5b8] bg-[#f8f6ef] px-4 py-5 text-center hover:border-[#16372f] hover:bg-[#edf4ef]">

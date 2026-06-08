@@ -14,7 +14,6 @@ export interface Product {
   name: string
   price: string
   reference?: string
-  variety?: string
   quantity: number
   image_url?: string
   status: string
