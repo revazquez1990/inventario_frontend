@@ -10,6 +10,7 @@ import {
   SuppliersPage,
   UnitsPage,
   UsersPage,
+  WarehousesPage,
 } from '@/features/app/Pages'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
@@ -30,6 +31,7 @@ export function AppRoutes() {
         <Route path="/attributes" element={<AttributesPage />} />
         <Route path="/units" element={<UnitsPage />} />
         <Route path="/users" element={<UsersPage />} />
+        <Route path="/warehouses" element={<WarehousesPage />} />
         <Route path="/reports/sales" element={<ReportsPage />} />
         <Route path="/reports/low-stock" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />

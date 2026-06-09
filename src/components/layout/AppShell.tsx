@@ -1,9 +1,10 @@
-import { Boxes, FileBarChart2, LogOut, Menu, PackageSearch, Settings, Tags, Truck, Users } from 'lucide-react'
+import { Boxes, FileBarChart2, LogOut, Menu, PackageSearch, Settings, Tags, Truck, Users, Warehouse } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { queryClient } from '@/lib/query-client'
 import { useLogoutMutation, useMeQuery } from '@/features/auth/auth.api'
 import { RateBadge } from '@/components/ui/RateBadge'
+import { WarehouseSelector } from '@/features/warehouse/WarehouseSelector'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -24,6 +25,7 @@ export function AppShell({ children }: AppShellProps) {
     { to: '/attributes', label: 'Atributos', icon: Tags, adminOnly: true },
     { to: '/suppliers', label: 'Proveedores', icon: Truck, adminOnly: false },
     { to: '/reports/sales', label: 'Reportes', icon: FileBarChart2, adminOnly: false },
+    { to: '/warehouses', label: 'Almacenes', icon: Warehouse, adminOnly: true },
     { to: '/settings', label: 'Configuración', icon: Settings, adminOnly: false },
     { to: '/users', label: 'Usuarios', icon: Users, adminOnly: true },
   ].filter((item) => !item.adminOnly || user?.role === 'admin')
@@ -57,6 +59,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
+            <WarehouseSelector />
             <div className="hidden md:block">
               <RateBadge />
             </div>

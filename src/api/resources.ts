@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/api/client'
-import type { Paginated, User } from '@/types/api'
+import type { Paginated, User, Warehouse } from '@/types/api'
 
 export interface OptionItem {
   id: number
@@ -80,6 +80,8 @@ export interface ProductHistoryEntry {
   created_at: string
   created_by?: string | null
   supplier?: string | null
+  warehouse?: string | null
+  to_warehouse?: string | null
   reason?: string | null
 }
 
@@ -94,6 +96,8 @@ export interface Movement {
   tax_rate_snapshot: string
   reason?: string | null
   reason_void?: string | null
+  warehouse?: { id: number; name: string } | null
+  to_warehouse?: { id: number; name: string } | null
   supplier?: { id: number; name: string } | null
   created_by?: MovementUser | null
   voided_by?: MovementUser | null
@@ -184,4 +188,8 @@ export function useAttributes() {
 
 export function useMovements(params = '?per_page=50') {
   return usePaginated<Movement>(`movements${params}`, `/movements${params}`)
+}
+
+export function useWarehouses() {
+  return useList<Warehouse>('warehouses', '/warehouses')
 }

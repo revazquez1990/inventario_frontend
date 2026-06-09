@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/api/client'
 import { authStorage } from '@/lib/auth-storage'
+import { warehouseStorage } from '@/lib/warehouse-storage'
 import type { AuthResponse, User } from '@/types/api'
 
 export interface LoginInput {
@@ -29,6 +30,7 @@ export function useLogoutMutation() {
     },
     onSettled: () => {
       authStorage.clear()
+      warehouseStorage.clear()
     },
   })
 }

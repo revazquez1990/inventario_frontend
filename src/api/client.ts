@@ -5,6 +5,7 @@ import axios, {
 } from 'axios'
 import { env } from '@/lib/env'
 import { authStorage } from '@/lib/auth-storage'
+import { warehouseStorage } from '@/lib/warehouse-storage'
 
 export const apiClient = axios.create({
   baseURL: env.apiBaseUrl,
@@ -16,6 +17,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`)
   }
+  config.headers.set('X-Warehouse-Id', warehouseStorage.get())
   if (!(config.data instanceof FormData)) {
     config.headers.set('Content-Type', 'application/json')
   }
