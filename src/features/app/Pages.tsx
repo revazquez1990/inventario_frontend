@@ -33,8 +33,10 @@ import {
   useProducts,
   usePut,
   useUsers,
+  useWarehouses,
 } from '@/api/resources'
 import { AppShell } from '@/components/layout/AppShell'
+import { useWarehouse } from '@/features/warehouse/warehouse-context'
 import { ConfirmDestructiveModal } from '@/components/ui/ConfirmDestructiveModal'
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay'
 import { MovementCodeChip } from '@/components/ui/MovementCodeChip'
@@ -303,13 +305,14 @@ function MovementDetailModal({ movement, onClose }: { movement: Movement; onClos
   })
   const m = detailQuery.data ?? movement
 
-  const typeLabel: Record<string, string> = { entrada: 'Entrada', salida: 'Salida', venta: 'Venta', ajuste: 'Ajuste', anulacion: 'Anulación' }
+  const typeLabel: Record<string, string> = { entrada: 'Entrada', salida: 'Salida', venta: 'Venta', ajuste: 'Ajuste', anulacion: 'Anulación', transferencia: 'Transferencia' }
   const typeColor: Record<string, string> = {
     entrada: 'bg-[#edf4ef] text-[#16372f]',
     salida: 'bg-[#fff1ea] text-[#8a2d1b]',
     venta: 'bg-[#fff1ea] text-[#8a2d1b]',
     ajuste: 'bg-[#f0f0f0] text-[#3d443b]',
     anulacion: 'bg-[#f0f0f0] text-[#687168]',
+    transferencia: 'bg-[#eef2ff] text-[#3730a3]',
   }
 
   return (
@@ -353,6 +356,12 @@ function MovementDetailModal({ movement, onClose }: { movement: Movement; onClos
 
           {/* metadata */}
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
+            {m.warehouse && (
+              <div className="col-span-2">
+                <dt className="text-xs text-[#687168]">{m.type === 'transferencia' ? 'Transferencia' : 'Almacén'}</dt>
+                <dd className="font-medium">{m.warehouse.name}{m.to_warehouse ? ` → ${m.to_warehouse.name}` : ''}</dd>
+              </div>
+            )}
             {m.supplier && (
               <div className="col-span-2">
                 <dt className="text-xs text-[#687168]">Proveedor</dt>
@@ -416,6 +425,10 @@ export function UnitsPage() {
 
 export function SuppliersPage() {
   return <SimpleCatalogPage title="Proveedores" endpoint="/suppliers" queryKey="suppliers" fields={[['name', 'Nombre'], ['contact_name', 'Contacto'], ['phone', 'Teléfono'], ['email', 'Correo']]} />
+}
+
+export function WarehousesPage() {
+  return <SimpleCatalogPage title="Almacenes" endpoint="/warehouses" queryKey="warehouses" fields={[['name', 'Nombre'], ['code', 'Código'], ['address', 'Dirección']]} />
 }
 
 function SimpleCatalogPage({ title, endpoint, queryKey, fields }: { title: string; endpoint: string; queryKey: string; fields: Array<[string, string]> }) {
@@ -522,6 +535,7 @@ export function AttributesPage() {
 }
 
 export function ProductsPage() {
+  const { isAll } = useWarehouse()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const params = useMemo(() => {
@@ -683,6 +697,11 @@ export function ProductsPage() {
                 <Field label="Precio unitario (USD)" name="price" type="number" required defaultValue={editing?.price ?? '0'} />
                 <Field label="Cantidad" name="quantity" type="number" required defaultValue={editing?.quantity ?? '0'} onChange={(e) => !editingProduct && setInitialQty(Number(e.target.value))} />
               </div>
+              {!editingProduct && isAll && initialQty > 0 ? (
+                <div className="rounded-md border border-[#dfb84b] bg-[#fff7d7] px-3 py-2 text-sm font-medium text-[#6d5312]">
+                  Selecciona un almacén concreto en la barra superior para registrar el stock inicial.
+                </div>
+              ) : null}
               {!editingProduct && initialQty > 0 ? (
                 <SelectField label="Proveedor (stock inicial)" name="supplier_id">
                   <option value="">Sin proveedor</option>
@@ -839,6 +858,7 @@ export function ProductsPage() {
 
 export function MovementsPage() {
   const queryClient = useQueryClient()
+  const { warehouses, isAll, selectedId } = useWarehouse()
   const [filters, setFilters] = useState({ type: '', status: '', code: '' })
   const movementParams = useMemo(() => {
     const query = new URLSearchParams({ per_page: '50' })
@@ -862,6 +882,7 @@ export function MovementsPage() {
   })
   const [type, setType] = useState('venta')
   const [supplierId, setSupplierId] = useState('')
+  const [toWarehouseId, setToWarehouseId] = useState('')
   const [reason, setReason] = useState('')
   const [adjustmentSubtype, setAdjustmentSubtype] = useState('merma')
   const [lines, setLines] = useState<Array<{ product_id: number | ''; quantity: string; unit_price_with_tax_usd: string }>>([{ product_id: '', quantity: '1', unit_price_with_tax_usd: '' }])
@@ -908,10 +929,18 @@ export function MovementsPage() {
       payload.reason = reason
       payload.adjustment_subtype = adjustmentSubtype
     }
+    if (type === 'transferencia') {
+      payload.to_warehouse_id = numberOrZero(toWarehouseId)
+      payload.reason = reason
+    }
     create.mutate({ path: `/movements/${type}`, input: payload })
     setLines([{ product_id: '', quantity: '1', unit_price_with_tax_usd: '' }])
     setReason('')
+    setToWarehouseId('')
   }
+
+  const transferTargets = warehouses.filter((warehouse) => warehouse.id !== selectedId)
+  const submitDisabled = isAll || (type === 'transferencia' && !toWarehouseId)
 
   return (
     <AppShell>
@@ -919,11 +948,16 @@ export function MovementsPage() {
       <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
         <Card>
           <form className="space-y-4" onSubmit={submit}>
-            <div className="grid grid-cols-4 gap-2">
-              {['venta', 'entrada', 'salida', 'ajuste'].map((item) => (
+            <div className="grid grid-cols-3 gap-2">
+              {['venta', 'entrada', 'salida', 'ajuste', 'transferencia'].map((item) => (
                 <button key={item} className={`h-10 cursor-pointer rounded-md border text-sm capitalize ${type === item ? 'border-[#16372f] bg-[#16372f] text-white' : 'border-[#c9c5b8]'}`} type="button" onClick={() => setType(item)}>{item}</button>
               ))}
             </div>
+            {isAll ? (
+              <div className="rounded-md border border-[#dfb84b] bg-[#fff7d7] px-3 py-2 text-sm font-medium text-[#6d5312]">
+                Selecciona un almacén concreto en la barra superior para registrar movimientos.
+              </div>
+            ) : null}
             <div className="space-y-3">
               {lines.map((line, index) => {
                 const selected = typeof line.product_id === 'number' ? productsById.get(line.product_id) : undefined
@@ -946,7 +980,13 @@ export function MovementsPage() {
                 {(suppliers.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </SelectField>
             ) : null}
-            {type === 'salida' || type === 'ajuste' ? (
+            {type === 'transferencia' ? (
+              <SelectField label="Almacén destino" name="to_warehouse_id" required value={toWarehouseId} onChange={setToWarehouseId}>
+                <option value="">Seleccionar destino</option>
+                {transferTargets.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+              </SelectField>
+            ) : null}
+            {type === 'salida' || type === 'ajuste' || type === 'transferencia' ? (
               <label className="block">
                 <span className="mb-1 block text-sm font-medium">Motivo</span>
                 <input className="h-11 w-full rounded-md border border-[#c9c5b8] px-3" value={reason} onChange={(event) => setReason(event.target.value)} required={type === 'ajuste'} />
@@ -963,14 +1003,21 @@ export function MovementsPage() {
               Total estimado: <MoneyDisplay usd={totalUsd} rate={todayRate} />
             </div>
             <ErrorText error={create.error} />
-            <SubmitButton label="Registrar" icon={<RefreshCw className="size-4" />} />
+            <button
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md bg-[#16372f] px-4 font-semibold text-white hover:bg-[#0f2b25] disabled:cursor-not-allowed disabled:opacity-50"
+              type="submit"
+              disabled={submitDisabled}
+            >
+              <RefreshCw className="size-4" />
+              Registrar
+            </button>
           </form>
         </Card>
         <Card>
           <div className="mb-4 grid gap-3 md:grid-cols-3">
             <select className="h-11 rounded-md border border-[#c9c5b8] px-3" value={filters.type} onChange={(event) => setFilters((current) => ({ ...current, type: event.target.value }))}>
               <option value="">Tipo</option>
-              {['entrada', 'salida', 'venta', 'ajuste', 'anulacion'].map((item) => <option key={item} value={item}>{item}</option>)}
+              {['entrada', 'salida', 'venta', 'ajuste', 'anulacion', 'transferencia'].map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
             <select className="h-11 rounded-md border border-[#c9c5b8] px-3" value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
               <option value="">Estado</option>
@@ -1135,23 +1182,43 @@ export function ReportsPage() {
 
 export function UsersPage() {
   const users = useUsers()
-  const create = usePost<Record<string, string>>(['users'])
-  const update = usePut<Record<string, string>>(['users'])
+  const warehouses = useWarehouses()
+  const create = usePost<Record<string, unknown>>(['users'])
+  const update = usePut<Record<string, unknown>>(['users'])
   const [editing, setEditing] = useState<User | null>(null)
+  const [role, setRole] = useState('almacenero')
+  const [warehouseIds, setWarehouseIds] = useState<number[]>([])
+
+  function startEdit(user: User) {
+    setEditing(user)
+    setRole(user.role)
+    setWarehouseIds((user.warehouses ?? []).map((warehouse) => warehouse.id))
+  }
+
+  function cancelEdit() {
+    setEditing(null)
+    setRole('almacenero')
+    setWarehouseIds([])
+  }
+
+  function toggleWarehouse(id: number) {
+    setWarehouseIds((prev) => (prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]))
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const input = formDataToObject(new FormData(event.currentTarget))
+    const input = formDataToObject(new FormData(event.currentTarget)) as Record<string, unknown>
     if (editing && input.password === '') {
       delete input.password
     }
+    input.warehouse_ids = role === 'almacenero' ? warehouseIds : []
     if (editing) {
       update.mutate({ path: `/users/${editing.id}`, input })
     } else {
       create.mutate({ path: '/users', input })
     }
     event.currentTarget.reset()
-    setEditing(null)
+    cancelEdit()
   }
 
   return (
@@ -1163,15 +1230,40 @@ export function UsersPage() {
             <Field label="Nombre" name="name" required defaultValue={editing?.name ?? ''} />
             <Field label="Correo" name="email" type="email" required defaultValue={editing?.email ?? ''} />
             <Field label="Contraseña" name="password" type="password" required={!editing} />
-            <SelectField label="Rol" name="role" required defaultValue={editing?.role ?? 'almacenero'}>
+            <SelectField label="Rol" name="role" required value={role} onChange={setRole}>
               <option value="almacenero">Almacenero</option>
               <option value="admin">Admin</option>
             </SelectField>
+            {role === 'almacenero' ? (
+              <div className="rounded-md border border-[#e8e3d4] bg-[#f8f6ef] p-3">
+                <p className="mb-2 text-sm font-medium text-[#3d443b]">Almacenes con acceso</p>
+                {(warehouses.data ?? []).length === 0 ? (
+                  <p className="text-xs text-[#687168]">No hay almacenes creados. Créalos en la sección Almacenes.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(warehouses.data ?? []).map((warehouse) => {
+                      const active = warehouseIds.includes(warehouse.id)
+                      return (
+                        <button
+                          type="button"
+                          key={warehouse.id}
+                          onClick={() => toggleWarehouse(warehouse.id)}
+                          className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium ${active ? 'border-[#16372f] bg-[#16372f] text-white' : 'border-[#c9c5b8] bg-white text-[#3d443b] hover:border-[#16372f]'}`}
+                        >
+                          {warehouse.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {warehouseIds.length === 0 ? <p className="mt-2 text-xs text-[#8a2d1b]">Selecciona al menos un almacén.</p> : null}
+              </div>
+            ) : null}
             <StatusSelect defaultValue={editing?.status ?? 'active'} />
             <ErrorText error={create.error ?? update.error} />
             <div className="flex flex-wrap gap-2">
               <SubmitButton label={editing ? 'Actualizar usuario' : 'Crear usuario'} icon={<Users className="size-4" />} />
-              {editing ? <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setEditing(null)}>Cancelar</button> : null}
+              {editing ? <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={cancelEdit}>Cancelar</button> : null}
             </div>
           </form>
         </Card>
@@ -1179,8 +1271,13 @@ export function UsersPage() {
           <div className="space-y-2">
             {(users.data?.data ?? []).map((user: User) => (
               <div key={user.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white px-3 py-2 text-sm">
-                <span>{user.name} · {user.email} · {user.role} · {user.status}</span>
-                <ActionButton onClick={() => setEditing(user)}><Edit3 className="size-4" /> Editar</ActionButton>
+                <span>
+                  {user.name} · {user.email} · {user.role} · {user.status}
+                  {user.role === 'almacenero' && (user.warehouses?.length ?? 0) > 0
+                    ? ` · ${(user.warehouses ?? []).map((warehouse) => warehouse.name).join(', ')}`
+                    : ''}
+                </span>
+                <ActionButton onClick={() => startEdit(user)}><Edit3 className="size-4" /> Editar</ActionButton>
               </div>
             ))}
           </div>
