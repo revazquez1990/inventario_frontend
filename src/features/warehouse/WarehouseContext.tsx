@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ALL_WAREHOUSES, warehouseStorage } from '@/lib/warehouse-storage'
+import { ALL_STORES, ALL_WAREHOUSES, warehouseStorage } from '@/lib/warehouse-storage'
 import { useMeQuery } from '@/features/auth/auth.api'
 import { WarehouseContext, type WarehouseContextValue } from '@/features/warehouse/warehouse-context'
+
+const AGGREGATES = [ALL_WAREHOUSES, ALL_STORES]
 
 export function WarehouseProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
@@ -15,7 +17,7 @@ export function WarehouseProvider({ children }: { children: React.ReactNode }) {
   const setValue = useCallback(
     (next: string) => {
       warehouseStorage.set(next)
-      // Refetch everything so listings reflect the newly selected warehouse.
+      // Refetch everything so listings reflect the newly selected location.
       void queryClient.invalidateQueries()
     },
     [queryClient],
@@ -27,9 +29,9 @@ export function WarehouseProvider({ children }: { children: React.ReactNode }) {
 
     const ids = warehouses.map((warehouse) => String(warehouse.id))
     const isValidConcrete = ids.includes(value)
-    const isValidAll = value === ALL_WAREHOUSES && isAdmin
+    const isValidAggregate = AGGREGATES.includes(value) && isAdmin
 
-    if (isValidConcrete || isValidAll) return
+    if (isValidConcrete || isValidAggregate) return
 
     const fallback = isAdmin ? ALL_WAREHOUSES : (ids[0] ?? ALL_WAREHOUSES)
     if (fallback !== value) {
@@ -37,17 +39,21 @@ export function WarehouseProvider({ children }: { children: React.ReactNode }) {
     }
   }, [meQuery.data, warehouses, value, isAdmin])
 
-  const contextValue = useMemo<WarehouseContextValue>(
-    () => ({
+  const contextValue = useMemo<WarehouseContextValue>(() => {
+    const isAggregate = AGGREGATES.includes(value)
+    const selectedId = isAggregate ? null : Number(value)
+    const selected = selectedId !== null ? warehouses.find((w) => w.id === selectedId) : undefined
+
+    return {
       value,
-      selectedId: value === ALL_WAREHOUSES ? null : Number(value),
-      isAll: value === ALL_WAREHOUSES,
+      selectedId,
+      selectedKind: selected?.kind ?? null,
+      isAggregate,
       isAdmin,
       warehouses,
       setValue,
-    }),
-    [value, isAdmin, warehouses, setValue],
-  )
+    }
+  }, [value, isAdmin, warehouses, setValue])
 
   return <WarehouseContext.Provider value={contextValue}>{children}</WarehouseContext.Provider>
 }

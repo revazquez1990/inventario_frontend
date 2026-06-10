@@ -1,7 +1,8 @@
 const KEY = 'inventario.warehouse'
 
-// Sentinel value used by the backend to mean "every accessible warehouse".
+// Sentinel values understood by the backend for aggregate scopes.
 export const ALL_WAREHOUSES = 'all'
+export const ALL_STORES = 'all-tiendas'
 
 type Listener = () => void
 const listeners = new Set<Listener>()

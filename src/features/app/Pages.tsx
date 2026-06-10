@@ -32,6 +32,7 @@ import {
   usePost,
   useProducts,
   usePut,
+  useStoreProducts,
   useUsers,
   useWarehouses,
 } from '@/api/resources'
@@ -428,19 +429,143 @@ export function SuppliersPage() {
 }
 
 export function WarehousesPage() {
-  return <SimpleCatalogPage title="Almacenes" endpoint="/warehouses" queryKey="warehouses" fields={[['name', 'Nombre'], ['code', 'Código'], ['address', 'Dirección']]} />
+  return (
+    <SimpleCatalogPage
+      title="Almacenes"
+      eyebrow="Ubicaciones"
+      endpoint="/warehouses"
+      queryKey="warehouses-almacen"
+      listParams="?kind=almacen"
+      createWith={{ kind: 'almacen' }}
+      invalidateKeys={['warehouses-almacen', 'warehouses']}
+      fields={[['name', 'Nombre'], ['code', 'Código'], ['address', 'Dirección']]}
+    />
+  )
 }
 
-function SimpleCatalogPage({ title, endpoint, queryKey, fields }: { title: string; endpoint: string; queryKey: string; fields: Array<[string, string]> }) {
-  const items = useList<Record<string, string | number>>(queryKey, endpoint)
-  const create = usePost<Record<string, string>>([queryKey])
-  const update = usePut<Record<string, string>>([queryKey])
-  const remove = useDelete([queryKey])
+function StorePricesModal({ store, onClose }: { store: { id: number; name: string }; onClose: () => void }) {
+  const products = useStoreProducts(store.id)
+  const queryClient = useQueryClient()
+  const [drafts, setDrafts] = useState<Record<number, string>>({})
+
+  const save = useMutation({
+    mutationFn: async ({ productId, salePrice }: { productId: number; salePrice: string }) =>
+      (await apiClient.put(`/warehouses/${store.id}/products/${productId}/price`, { sale_price: numberOrZero(salePrice) })).data,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['store-products', store.id] })
+      await queryClient.invalidateQueries({ queryKey: ['products'] })
+    },
+  })
+
+  return (
+    <ModalShell title={`Precios · ${store.name}`} onClose={onClose}>
+      {products.isPending ? <p className="text-sm text-[#687168]">Cargando...</p> : null}
+      {products.data?.length === 0 ? <p className="text-sm text-[#687168]">Esta tienda aún no tiene productos. Trasládalos desde un almacén.</p> : null}
+      <div className="space-y-2">
+        {(products.data ?? []).map((item) => {
+          const draft = drafts[item.product_id] ?? (item.sale_price ?? '')
+          return (
+            <div key={item.product_id} className="rounded-md border border-[#e8e3d4] bg-white p-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="font-medium">{item.name}</p>
+                  <p className="text-xs text-[#687168]">Cód: {item.code} · stock: {item.quantity} · costo base USD {item.base_price}</p>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  className="h-10 w-32 rounded-md border border-[#c9c5b8] px-3"
+                  type="number"
+                  step="0.01"
+                  placeholder="Precio venta"
+                  value={draft}
+                  onChange={(event) => setDrafts((prev) => ({ ...prev, [item.product_id]: event.target.value }))}
+                />
+                <button
+                  className="inline-flex h-10 cursor-pointer items-center gap-1 rounded-md bg-[#16372f] px-3 text-sm font-semibold text-white disabled:opacity-50"
+                  type="button"
+                  disabled={save.isPending || draft === ''}
+                  onClick={() => save.mutate({ productId: item.product_id, salePrice: String(draft) })}
+                >
+                  <Save className="size-4" /> Guardar
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </ModalShell>
+  )
+}
+
+export function StoresPage() {
+  const stores = useList<Record<string, string | number>>('warehouses-tienda', '/warehouses?kind=tienda')
+  const create = usePost<Record<string, string>>(['warehouses-tienda', 'warehouses'])
+  const update = usePut<Record<string, string>>(['warehouses-tienda', 'warehouses'])
+  const remove = useDelete(['warehouses-tienda', 'warehouses'])
+  const [editing, setEditing] = useState<Record<string, string | number> | null>(null)
+  const [pricing, setPricing] = useState<{ id: number; name: string } | null>(null)
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const input = { ...formDataToObject(new FormData(event.currentTarget)), kind: 'tienda' }
+    if (editing) {
+      update.mutate({ path: `/warehouses/${editing.id}`, input })
+    } else {
+      create.mutate({ path: '/warehouses', input })
+    }
+    event.currentTarget.reset()
+    setEditing(null)
+  }
+
+  return (
+    <AppShell>
+      <SectionTitle eyebrow="Ubicaciones" title="Tiendas" />
+      <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
+        <Card>
+          <form key={String(editing?.id ?? 'new')} className="space-y-4" onSubmit={submit}>
+            {([['name', 'Nombre'], ['code', 'Código'], ['address', 'Dirección']] as Array<[string, string]>).map(([name, label]) => (
+              <Field key={name} label={label} name={name} required={name === 'name'} defaultValue={editing?.[name] ?? ''} />
+            ))}
+            <StatusSelect defaultValue={String(editing?.status ?? 'active')} />
+            <ErrorText error={create.error ?? update.error ?? remove.error} />
+            <div className="flex flex-wrap gap-2">
+              <SubmitButton label={editing ? 'Actualizar' : 'Guardar'} icon={editing ? <Edit3 className="size-4" /> : <Plus className="size-4" />} />
+              {editing ? <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setEditing(null)}>Cancelar</button> : null}
+            </div>
+          </form>
+        </Card>
+        <Card>
+          <div className="space-y-2">
+            {(stores.data ?? []).map((store) => (
+              <div key={String(store.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#e8e3d4] bg-white px-3 py-2 text-sm">
+                <span className="font-medium">{String(store.name)}{store.code ? <span className="text-[#687168]"> · {String(store.code)}</span> : null}</span>
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton onClick={() => setPricing({ id: Number(store.id), name: String(store.name) })}><BadgeDollarSign className="size-4" /> Productos y precios</ActionButton>
+                  <ActionButton onClick={() => setEditing(store)}><Edit3 className="size-4" /> Editar</ActionButton>
+                  <ActionButton danger onClick={() => remove.mutate(`/warehouses/${store.id}`)}><Trash2 className="size-4" /> Eliminar</ActionButton>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+      {pricing ? <StorePricesModal store={pricing} onClose={() => setPricing(null)} /> : null}
+    </AppShell>
+  )
+}
+
+function SimpleCatalogPage({ title, endpoint, queryKey, fields, listParams = '', createWith = {}, invalidateKeys, eyebrow = 'Catálogo' }: { title: string; endpoint: string; queryKey: string; fields: Array<[string, string]>; listParams?: string; createWith?: Record<string, string>; invalidateKeys?: string[]; eyebrow?: string }) {
+  const keys = invalidateKeys ?? [queryKey]
+  const items = useList<Record<string, string | number>>(queryKey, `${endpoint}${listParams}`)
+  const create = usePost<Record<string, string>>(keys)
+  const update = usePut<Record<string, string>>(keys)
+  const remove = useDelete(keys)
   const [editing, setEditing] = useState<Record<string, string | number> | null>(null)
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const input = formDataToObject(new FormData(event.currentTarget))
+    const input = { ...formDataToObject(new FormData(event.currentTarget)), ...createWith }
     if (editing) {
       update.mutate({ path: `${endpoint}/${editing.id}`, input })
     } else {
@@ -452,7 +577,7 @@ function SimpleCatalogPage({ title, endpoint, queryKey, fields }: { title: strin
 
   return (
     <AppShell>
-      <SectionTitle eyebrow="Catálogo" title={title} />
+      <SectionTitle eyebrow={eyebrow} title={title} />
       <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
         <Card>
           <form key={String(editing?.id ?? 'new')} className="space-y-4" onSubmit={submit}>
@@ -535,7 +660,7 @@ export function AttributesPage() {
 }
 
 export function ProductsPage() {
-  const { isAll } = useWarehouse()
+  const { isAggregate } = useWarehouse()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const params = useMemo(() => {
@@ -697,7 +822,7 @@ export function ProductsPage() {
                 <Field label="Precio unitario (USD)" name="price" type="number" required defaultValue={editing?.price ?? '0'} />
                 <Field label="Cantidad" name="quantity" type="number" required defaultValue={editing?.quantity ?? '0'} onChange={(e) => !editingProduct && setInitialQty(Number(e.target.value))} />
               </div>
-              {!editingProduct && isAll && initialQty > 0 ? (
+              {!editingProduct && isAggregate && initialQty > 0 ? (
                 <div className="rounded-md border border-[#dfb84b] bg-[#fff7d7] px-3 py-2 text-sm font-medium text-[#6d5312]">
                   Selecciona un almacén concreto en la barra superior para registrar el stock inicial.
                 </div>
@@ -841,6 +966,9 @@ export function ProductsPage() {
                       <span className="rounded-md bg-[#edf4ef] px-2 py-1 font-semibold text-[#16372f]">
                         <MoneyDisplay compact usd={product.price} rate={todayRate} />
                       </span>
+                      {product.sale_price ? (
+                        <span className="rounded-md bg-[#eef2ff] px-2 py-1 font-semibold text-[#3730a3]">Venta USD {product.sale_price}</span>
+                      ) : null}
                       <StockBadge stock={product.quantity} />
                       {product.created_at ? <span className="text-[#687168]">Alta: {new Date(product.created_at).toLocaleDateString('es-ES')}</span> : null}
                     </div>
@@ -858,7 +986,7 @@ export function ProductsPage() {
 
 export function MovementsPage() {
   const queryClient = useQueryClient()
-  const { warehouses, isAll, selectedId } = useWarehouse()
+  const { warehouses, isAggregate, selectedId, selectedKind } = useWarehouse()
   const [filters, setFilters] = useState({ type: '', status: '', code: '' })
   const movementParams = useMemo(() => {
     const query = new URLSearchParams({ per_page: '50' })
@@ -880,12 +1008,16 @@ export function MovementsPage() {
       ])
     },
   })
-  const [type, setType] = useState('venta')
+  const [rawType, setType] = useState('venta')
+  // Stores only move stock through transfers in this release, so when operating
+  // in a store the type is forced to "transferencia".
+  const originIsStore = selectedKind === 'tienda'
+  const type = originIsStore ? 'transferencia' : rawType
   const [supplierId, setSupplierId] = useState('')
   const [toWarehouseId, setToWarehouseId] = useState('')
   const [reason, setReason] = useState('')
   const [adjustmentSubtype, setAdjustmentSubtype] = useState('merma')
-  const [lines, setLines] = useState<Array<{ product_id: number | ''; quantity: string; unit_price_with_tax_usd: string }>>([{ product_id: '', quantity: '1', unit_price_with_tax_usd: '' }])
+  const [lines, setLines] = useState<Array<{ product_id: number | ''; quantity: string; unit_price_with_tax_usd: string; sale_price: string }>>([{ product_id: '', quantity: '1', unit_price_with_tax_usd: '', sale_price: '' }])
   const [voiding, setVoiding] = useState<Movement | null>(null)
   const [viewingMovement, setViewingMovement] = useState<Movement | null>(null)
   const [voidReason, setVoidReason] = useState('')
@@ -912,6 +1044,11 @@ export function MovementsPage() {
     },
   })
 
+  const availableTypes = originIsStore ? ['transferencia'] : ['venta', 'entrada', 'salida', 'ajuste', 'transferencia']
+  const transferTargets = warehouses.filter((warehouse) => warehouse.id !== selectedId)
+  const destinationIsStore = type === 'transferencia'
+    && warehouses.find((warehouse) => warehouse.id === Number(toWarehouseId))?.kind === 'tienda'
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const payload: Record<string, unknown> = {
@@ -921,6 +1058,7 @@ export function MovementsPage() {
           product_id: line.product_id,
           quantity: numberOrZero(line.quantity),
           unit_price_with_tax_usd: line.unit_price_with_tax_usd ? numberOrZero(line.unit_price_with_tax_usd) : undefined,
+          sale_price: destinationIsStore && line.sale_price ? numberOrZero(line.sale_price) : undefined,
         })),
     }
     if (type === 'entrada') payload.supplier_id = supplierId ? numberOrZero(supplierId) : null
@@ -934,13 +1072,12 @@ export function MovementsPage() {
       payload.reason = reason
     }
     create.mutate({ path: `/movements/${type}`, input: payload })
-    setLines([{ product_id: '', quantity: '1', unit_price_with_tax_usd: '' }])
+    setLines([{ product_id: '', quantity: '1', unit_price_with_tax_usd: '', sale_price: '' }])
     setReason('')
     setToWarehouseId('')
   }
 
-  const transferTargets = warehouses.filter((warehouse) => warehouse.id !== selectedId)
-  const submitDisabled = isAll || (type === 'transferencia' && !toWarehouseId)
+  const submitDisabled = isAggregate || (type === 'transferencia' && !toWarehouseId)
 
   return (
     <AppShell>
@@ -949,13 +1086,18 @@ export function MovementsPage() {
         <Card>
           <form className="space-y-4" onSubmit={submit}>
             <div className="grid grid-cols-3 gap-2">
-              {['venta', 'entrada', 'salida', 'ajuste', 'transferencia'].map((item) => (
+              {availableTypes.map((item) => (
                 <button key={item} className={`h-10 cursor-pointer rounded-md border text-sm capitalize ${type === item ? 'border-[#16372f] bg-[#16372f] text-white' : 'border-[#c9c5b8]'}`} type="button" onClick={() => setType(item)}>{item}</button>
               ))}
             </div>
-            {isAll ? (
+            {isAggregate ? (
               <div className="rounded-md border border-[#dfb84b] bg-[#fff7d7] px-3 py-2 text-sm font-medium text-[#6d5312]">
-                Selecciona un almacén concreto en la barra superior para registrar movimientos.
+                Selecciona una ubicación concreta en la barra superior para registrar movimientos.
+              </div>
+            ) : null}
+            {originIsStore ? (
+              <div className="rounded-md border border-[#cdd7f0] bg-[#eef2ff] px-3 py-2 text-sm font-medium text-[#3730a3]">
+                Estás operando en una tienda: solo puedes registrar transferencias (entrada o salida de stock).
               </div>
             ) : null}
             <div className="space-y-3">
@@ -966,13 +1108,19 @@ export function MovementsPage() {
                     <VariantPicker products={products.data ?? []} value={line.product_id} onChange={(value) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, product_id: value } : item))} />
                     <div className="mt-3 grid gap-2 sm:grid-cols-[100px_1fr_44px]">
                       <input className="h-11 rounded-md border border-[#c9c5b8] px-3" type="number" value={line.quantity} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: event.target.value } : item))} />
-                      {type === 'entrada' ? <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="Precio compra USD" type="number" value={line.unit_price_with_tax_usd} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, unit_price_with_tax_usd: event.target.value } : item))} /> : <p className="flex min-h-11 items-center text-sm text-[#687168]">{selected ? <MoneyDisplay compact usd={selected.price} rate={todayRate} /> : 'Sin producto'}</p>}
+                      {type === 'entrada' ? (
+                        <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="Precio compra USD" type="number" value={line.unit_price_with_tax_usd} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, unit_price_with_tax_usd: event.target.value } : item))} />
+                      ) : destinationIsStore ? (
+                        <input className="h-11 rounded-md border border-[#c9c5b8] px-3" placeholder="Precio venta tienda" type="number" step="0.01" value={line.sale_price} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, sale_price: event.target.value } : item))} />
+                      ) : (
+                        <p className="flex min-h-11 items-center text-sm text-[#687168]">{selected ? <MoneyDisplay compact usd={selected.price} rate={todayRate} /> : 'Sin producto'}</p>
+                      )}
                       <button className="grid size-11 cursor-pointer place-items-center rounded-md border border-[#d69a8a] text-[#8a2d1b]" type="button" onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4" /></button>
                     </div>
                   </div>
                 )
               })}
-              <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setLines((current) => [...current, { product_id: '', quantity: '1', unit_price_with_tax_usd: '' }])}>Agregar línea</button>
+              <button className="h-11 cursor-pointer rounded-md border border-[#c9c5b8] px-4 font-medium" type="button" onClick={() => setLines((current) => [...current, { product_id: '', quantity: '1', unit_price_with_tax_usd: '', sale_price: '' }])}>Agregar línea</button>
             </div>
             {type === 'entrada' ? (
               <SelectField label="Proveedor" name="supplier_id" value={supplierId} onChange={setSupplierId}>
@@ -981,9 +1129,9 @@ export function MovementsPage() {
               </SelectField>
             ) : null}
             {type === 'transferencia' ? (
-              <SelectField label="Almacén destino" name="to_warehouse_id" required value={toWarehouseId} onChange={setToWarehouseId}>
+              <SelectField label="Ubicación destino" name="to_warehouse_id" required value={toWarehouseId} onChange={setToWarehouseId}>
                 <option value="">Seleccionar destino</option>
-                {transferTargets.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                {transferTargets.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.kind === 'tienda' ? ' (tienda)' : ''}</option>)}
               </SelectField>
             ) : null}
             {type === 'salida' || type === 'ajuste' || type === 'transferencia' ? (
@@ -1183,6 +1331,8 @@ export function ReportsPage() {
 export function UsersPage() {
   const users = useUsers()
   const warehouses = useWarehouses()
+  // Stores are transparent to almaceneros, so they can only be granted almacenes.
+  const warehouseOptions = (warehouses.data ?? []).filter((warehouse) => warehouse.kind !== 'tienda')
   const create = usePost<Record<string, unknown>>(['users'])
   const update = usePut<Record<string, unknown>>(['users'])
   const [editing, setEditing] = useState<User | null>(null)
@@ -1237,11 +1387,11 @@ export function UsersPage() {
             {role === 'almacenero' ? (
               <div className="rounded-md border border-[#e8e3d4] bg-[#f8f6ef] p-3">
                 <p className="mb-2 text-sm font-medium text-[#3d443b]">Almacenes con acceso</p>
-                {(warehouses.data ?? []).length === 0 ? (
+                {warehouseOptions.length === 0 ? (
                   <p className="text-xs text-[#687168]">No hay almacenes creados. Créalos en la sección Almacenes.</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {(warehouses.data ?? []).map((warehouse) => {
+                    {warehouseOptions.map((warehouse) => {
                       const active = warehouseIds.includes(warehouse.id)
                       return (
                         <button

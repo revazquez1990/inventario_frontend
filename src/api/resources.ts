@@ -33,6 +33,7 @@ export interface Product {
   price: string
   reference?: string
   quantity: number
+  sale_price?: string | null
   image_url?: string
   status: string
   created_at?: string
@@ -96,8 +97,8 @@ export interface Movement {
   tax_rate_snapshot: string
   reason?: string | null
   reason_void?: string | null
-  warehouse?: { id: number; name: string } | null
-  to_warehouse?: { id: number; name: string } | null
+  warehouse?: { id: number; name: string; kind?: string } | null
+  to_warehouse?: { id: number; name: string; kind?: string } | null
   supplier?: { id: number; name: string } | null
   created_by?: MovementUser | null
   voided_by?: MovementUser | null
@@ -192,4 +193,24 @@ export function useMovements(params = '?per_page=50') {
 
 export function useWarehouses() {
   return useList<Warehouse>('warehouses', '/warehouses')
+}
+
+export interface StoreProduct {
+  product_id: number
+  code: string
+  name: string
+  base_price: string
+  quantity: number
+  sale_price: string | null
+}
+
+export function useStoreProducts(storeId: number | null) {
+  return useQuery({
+    queryKey: ['store-products', storeId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ data: StoreProduct[] }>(`/warehouses/${storeId}/products`)
+      return data.data
+    },
+    enabled: storeId !== null,
+  })
 }

@@ -7,6 +7,7 @@ import {
   ProductsPage,
   ReportsPage,
   SettingsPage,
+  StoresPage,
   SuppliersPage,
   UnitsPage,
   UsersPage,
@@ -32,6 +33,7 @@ export function AppRoutes() {
         <Route path="/units" element={<UnitsPage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="/warehouses" element={<WarehousesPage />} />
+        <Route path="/stores" element={<StoresPage />} />
         <Route path="/reports/sales" element={<ReportsPage />} />
         <Route path="/reports/low-stock" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
