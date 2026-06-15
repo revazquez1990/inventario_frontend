@@ -1281,6 +1281,111 @@ export function SettingsPage() {
   )
 }
 
+function ProductExitsReportCard() {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const [periodType, setPeriodType] = useState('monthly')
+  const [year, setYear] = useState(String(now.getFullYear()))
+  const [month, setMonth] = useState(`${now.getFullYear()}-${pad(now.getMonth() + 1)}`)
+  const [date, setDate] = useState(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`)
+  const [from, setFrom] = useState(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`)
+  const [to, setTo] = useState(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`)
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState('')
+
+  const disabled = downloading
+    || (periodType === 'monthly' && !month)
+    || (periodType === 'weekly' && !date)
+    || (periodType === 'custom' && (!from || !to))
+
+  async function download() {
+    const params = new URLSearchParams({ period_type: periodType, format: 'xlsx' })
+    if (periodType === 'annual') params.set('year', year)
+    if (periodType === 'monthly') {
+      const [y = '', m = ''] = month.split('-')
+      params.set('year', y)
+      params.set('month', String(Number(m)))
+    }
+    if (periodType === 'weekly') params.set('date', date)
+    if (periodType === 'custom') {
+      params.set('from', from)
+      params.set('to', to)
+    }
+    setDownloading(true)
+    setError('')
+    try {
+      const response = await apiClient.get(`/reports/product-exits?${params.toString()}`, { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data as Blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'reporte_salidas.xlsx'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('No se pudo generar el reporte. Revisa el periodo seleccionado.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="mb-1 font-semibold">Salidas por producto</h2>
+      <p className="mb-3 text-sm text-[#687168]">Excel con salidas (salidas + ventas) y stock actual de la ubicación seleccionada.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <SelectField label="Periodo" name="period_type" value={periodType} onChange={setPeriodType}>
+          <option value="annual">Anual</option>
+          <option value="monthly">Mensual</option>
+          <option value="weekly">Semanal</option>
+          <option value="custom">Específico</option>
+        </SelectField>
+        {periodType === 'annual' ? (
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-[#3d443b]">Año</span>
+            <input className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3" type="number" min="2000" max="2100" value={year} onChange={(e) => setYear(e.target.value)} />
+          </label>
+        ) : null}
+        {periodType === 'monthly' ? (
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-[#3d443b]">Mes</span>
+            <input className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+          </label>
+        ) : null}
+        {periodType === 'weekly' ? (
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-[#3d443b]">Día de la semana</span>
+            <input className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+        ) : null}
+        {periodType === 'custom' ? (
+          <>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-[#3d443b]">Desde</span>
+              <input className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-[#3d443b]">Hasta</span>
+              <input className="h-11 w-full rounded-md border border-[#c9c5b8] bg-white px-3" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </label>
+          </>
+        ) : null}
+      </div>
+      {error ? <p className="mt-3 rounded-md bg-[#fff1ea] px-3 py-2 text-sm text-[#8a2d1b]">{error}</p> : null}
+      <div className="mt-4">
+        <button
+          className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-md bg-[#16372f] px-4 font-semibold text-white hover:bg-[#0f2b25] disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          disabled={disabled}
+          onClick={() => void download()}
+        >
+          <FileSpreadsheet className="size-4" />
+          {downloading ? 'Generando...' : 'Descargar Excel'}
+        </button>
+      </div>
+    </Card>
+  )
+}
+
 export function ReportsPage() {
   const lowStock = useList<Record<string, string | number>>('low-stock', '/reports/low-stock')
   const sales = useQuery({
@@ -1299,7 +1404,7 @@ export function ReportsPage() {
 
   return (
     <AppShell>
-      <SectionTitle eyebrow="Reportes" title="Ventas y bajo mínimo" />
+      <SectionTitle eyebrow="Reportes" title="Ventas, bajo mínimo y salidas" />
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <h2 className="mb-3 font-semibold">Ventas del período</h2>
@@ -1323,6 +1428,9 @@ export function ReportsPage() {
             <ActionButton onClick={() => void downloadReport('/reports/low-stock?format=pdf', 'productos_sin_stock.pdf')}><FileText className="size-4" /> PDF</ActionButton>
           </div>
         </Card>
+      </div>
+      <div className="mt-5">
+        <ProductExitsReportCard />
       </div>
     </AppShell>
   )
