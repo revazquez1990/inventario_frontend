@@ -1,4 +1,4 @@
-import { Boxes, FileBarChart2, LogOut, Menu, PackageSearch, Settings, Tags, Truck, Users, Warehouse } from 'lucide-react'
+import { Boxes, FileBarChart2, LogOut, Menu, PackageSearch, Settings, Store, Tags, Truck, Users, Warehouse } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { queryClient } from '@/lib/query-client'
@@ -26,6 +26,7 @@ export function AppShell({ children }: AppShellProps) {
     { to: '/suppliers', label: 'Proveedores', icon: Truck, adminOnly: false },
     { to: '/reports/sales', label: 'Reportes', icon: FileBarChart2, adminOnly: false },
     { to: '/warehouses', label: 'Almacenes', icon: Warehouse, adminOnly: true },
+    { to: '/stores', label: 'Tiendas', icon: Store, adminOnly: true },
     { to: '/settings', label: 'Configuración', icon: Settings, adminOnly: false },
     { to: '/users', label: 'Usuarios', icon: Users, adminOnly: true },
   ].filter((item) => !item.adminOnly || user?.role === 'admin')

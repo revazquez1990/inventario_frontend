@@ -1,9 +1,12 @@
 export type UserRole = 'admin' | 'almacenero'
 export type UserStatus = 'active' | 'inactive' | 'deleted'
 
+export type WarehouseKind = 'almacen' | 'tienda'
+
 export interface Warehouse {
   id: number
   name: string
+  kind?: WarehouseKind
   code?: string | null
   address?: string | null
   status?: string
@@ -15,7 +18,7 @@ export interface User {
   email: string
   role: UserRole
   status: UserStatus
-  warehouses?: Array<Pick<Warehouse, 'id' | 'name'>>
+  warehouses?: Array<Pick<Warehouse, 'id' | 'name' | 'kind'>>
 }
 
 export interface AuthResponse {

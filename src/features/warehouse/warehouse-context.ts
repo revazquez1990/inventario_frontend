@@ -1,14 +1,18 @@
 import { createContext, useContext } from 'react'
-import type { Warehouse } from '@/types/api'
+import type { Warehouse, WarehouseKind } from '@/types/api'
 
 export interface WarehouseContextValue {
-  /** Raw selector value: `ALL_WAREHOUSES` or a numeric id as string. */
+  /** Raw selector value: `ALL_WAREHOUSES`, `ALL_STORES`, or a numeric id as string. */
   value: string
-  /** Concrete warehouse id, or null when "all warehouses" is active. */
+  /** Concrete location id, or null when an aggregate scope is active. */
   selectedId: number | null
-  isAll: boolean
+  /** Kind of the concrete location, or null for aggregates. */
+  selectedKind: WarehouseKind | null
+  /** True when the scope is an aggregate ("all warehouses" / "all stores"). */
+  isAggregate: boolean
   isAdmin: boolean
-  warehouses: Array<Pick<Warehouse, 'id' | 'name'>>
+  /** Every accessible location (admin: warehouses + stores; almacenero: their almacenes). */
+  warehouses: Array<Pick<Warehouse, 'id' | 'name' | 'kind'>>
   setValue: (value: string) => void
 }
 
