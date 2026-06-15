@@ -1311,6 +1311,11 @@ function ProductExitsReportCard() {
       params.set('from', from)
       params.set('to', to)
     }
+    const typeSuffix: Record<string, string> = { annual: 'anual', monthly: 'mensual', weekly: 'semanal' }
+    const toDmy = (d: string) => d.split('-').reverse().join('-')
+    const suffix = periodType === 'custom' ? `${toDmy(from)}_${toDmy(to)}` : (typeSuffix[periodType] ?? periodType)
+    const filename = `reporte_salidas_${suffix}.xlsx`
+
     setDownloading(true)
     setError('')
     try {
@@ -1318,7 +1323,7 @@ function ProductExitsReportCard() {
       const url = URL.createObjectURL(response.data as Blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = 'reporte_salidas.xlsx'
+      link.download = filename
       link.click()
       URL.revokeObjectURL(url)
     } catch {
