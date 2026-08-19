@@ -86,12 +86,15 @@ export interface ProductHistoryEntry {
   reason?: string | null
 }
 
+export type TransferStatus = 'en_transito' | 'recibido'
+
 export interface Movement {
   id: number
   type: string
   adjustment_subtype?: string | null
   code: string
   status: string
+  transfer_status?: TransferStatus | null
   created_at: string
   exchange_rate_snapshot: string
   tax_rate_snapshot: string
@@ -103,6 +106,8 @@ export interface Movement {
   created_by?: MovementUser | null
   voided_by?: MovementUser | null
   voided_at?: string | null
+  received_by?: MovementUser | null
+  received_at?: string | null
   totals: {
     without_tax_usd: string
     tax_usd: string

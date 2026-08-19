@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   FileText,
   ImageIcon,
+  PackageCheck,
   PackagePlus,
   Plus,
   RefreshCw,
@@ -327,6 +328,11 @@ function MovementDetailModal({ movement, onClose }: { movement: Movement; onClos
             <span className={`rounded-md px-2.5 py-1 text-xs font-semibold capitalize ${typeColor[m.type] ?? ''}`}>{typeLabel[m.type] ?? m.type}</span>
             {m.adjustment_subtype && <span className="rounded-md bg-[#f0f0f0] px-2.5 py-1 text-xs font-medium capitalize">{m.adjustment_subtype}</span>}
             <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${m.status === 'anulado' ? 'bg-[#fff1ea] text-[#8a2d1b]' : 'bg-[#edf4ef] text-[#16372f]'}`}>{m.status}</span>
+            {m.type === 'transferencia' && m.transfer_status && (
+              <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${m.transfer_status === 'en_transito' ? 'bg-[#fbf6e6] text-[#7a5c15]' : 'bg-[#edf4ef] text-[#16372f]'}`}>
+                {m.transfer_status === 'en_transito' ? 'En tránsito' : 'Recibida'}
+              </span>
+            )}
           </div>
 
           {/* totals */}
@@ -438,7 +444,7 @@ export function WarehousesPage() {
       listParams="?kind=almacen"
       createWith={{ kind: 'almacen' }}
       invalidateKeys={['warehouses-almacen', 'warehouses']}
-      fields={[['name', 'Nombre'], ['code', 'Código'], ['address', 'Dirección']]}
+      fields={[['name', 'Nombre'], ['code', 'Código'], ['node_id', 'Nodo (sincronización)'], ['address', 'Dirección']]}
     />
   )
 }
@@ -1044,6 +1050,16 @@ export function MovementsPage() {
     },
   })
 
+  const receiveMutation = useMutation({
+    mutationFn: async (id: number) => (await apiClient.post(`/movements/${id}/recibir`)).data,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [`movements${movementParams}`] }),
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+      ])
+    },
+  })
+
   const availableTypes = originIsStore ? ['transferencia'] : ['venta', 'entrada', 'salida', 'ajuste', 'transferencia']
   const transferTargets = warehouses.filter((warehouse) => warehouse.id !== selectedId)
   const destinationIsStore = type === 'transferencia'
@@ -1177,15 +1193,28 @@ export function MovementsPage() {
           <div className="space-y-3">
             {(movements.data?.data ?? []).map((movement: Movement) => (
               <article key={movement.id} className="rounded-md border border-[#e8e3d4] bg-white p-4">
-                <div className="flex flex-wrap justify-between gap-3">
-                  <MovementCodeChip code={movement.code} status={movement.status} />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <MovementCodeChip code={movement.code} status={movement.status} />
+                    {movement.type === 'transferencia' && movement.transfer_status ? (
+                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${movement.transfer_status === 'en_transito' ? 'bg-[#fbf6e6] text-[#7a5c15]' : 'bg-[#edf4ef] text-[#16372f]'}`}>
+                        {movement.transfer_status === 'en_transito' ? 'En tránsito' : 'Recibida'}
+                      </span>
+                    ) : null}
+                  </div>
                   <MoneyDisplay usd={movement.totals.with_tax_usd} cup={movement.totals.with_tax_cup} rate={movement.exchange_rate_snapshot} />
                 </div>
                 <p className="mt-1 text-sm text-[#687168]">{movement.status} · ratio {movement.exchange_rate_snapshot} · impuesto {movement.tax_rate_snapshot}%</p>
+                {movement.type === 'transferencia' && movement.warehouse ? (
+                  <p className="mt-1 text-sm font-medium text-[#3730a3]">{movement.warehouse.name}{movement.to_warehouse ? ` → ${movement.to_warehouse.name}` : ''}</p>
+                ) : null}
                 <p className="mt-2 text-sm text-[#3d443b]">{movement.items.map((item) => `${item.product_name} x ${item.quantity}`).join(', ')}</p>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex gap-2">
                     <ActionButton onClick={() => setViewingMovement(movement)}>Ver más</ActionButton>
+                    {movement.type === 'transferencia' && movement.transfer_status === 'en_transito' && movement.status === 'activo' ? (
+                      <ActionButton onClick={() => receiveMutation.mutate(movement.id)}><PackageCheck className="size-4" /> Recibir</ActionButton>
+                    ) : null}
                     {movement.status === 'activo' && movement.type !== 'anulacion' ? (
                       <ActionButton danger onClick={() => setVoiding(movement)}><XCircle className="size-4" /> Anular</ActionButton>
                     ) : null}

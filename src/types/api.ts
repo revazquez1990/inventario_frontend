@@ -8,6 +8,7 @@ export interface Warehouse {
   name: string
   kind?: WarehouseKind
   code?: string | null
+  node_id?: string | null
   address?: string | null
   status?: string
 }

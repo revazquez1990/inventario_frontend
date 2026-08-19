@@ -5,6 +5,7 @@ import { queryClient } from '@/lib/query-client'
 import { useLogoutMutation, useMeQuery } from '@/features/auth/auth.api'
 import { RateBadge } from '@/components/ui/RateBadge'
 import { WarehouseSelector } from '@/features/warehouse/WarehouseSelector'
+import { SyncStatusButton } from '@/features/sync/SyncStatusButton'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -60,6 +61,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
+            <SyncStatusButton />
             <WarehouseSelector />
             <div className="hidden md:block">
               <RateBadge />
