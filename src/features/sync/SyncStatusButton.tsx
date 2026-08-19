@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, RefreshCw, UploadCloud } from 'lucide-react'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSyncRun, useSyncStatus } from './sync.api'
 
 function timeAgo(iso: string | null): string {
@@ -26,6 +26,7 @@ export function SyncStatusButton() {
 
   const canSync = status?.role === 'node' && status.central_configured
   const isPending = runMutation.isPending
+  const [justSynced, setJustSynced] = useState(false)
 
   const sync = useCallback(() => {
     if (canSync && !isPending) runMutation.mutate()
@@ -44,6 +45,15 @@ export function SyncStatusButton() {
     }
   }, [])
 
+  // Confirmación transitoria "Actualizado ✓" tras una sincronización exitosa
+  // (incluye la bajada de datos e imágenes, no solo las subidas pendientes).
+  useEffect(() => {
+    if (!runMutation.isSuccess) return
+    setJustSynced(true)
+    const t = window.setTimeout(() => setJustSynced(false), 3000)
+    return () => window.clearTimeout(t)
+  }, [runMutation.isSuccess, runMutation.data])
+
   if (!status || status.role !== 'node') return null
 
   const pending = status.pending_total
@@ -56,7 +66,9 @@ export function SyncStatusButton() {
       ? 'Sincronizando…'
       : pending > 0
         ? `${pending} por subir`
-        : 'Al día'
+        : justSynced
+          ? 'Actualizado'
+          : 'Al día'
 
   const tone = notConfigured || failed
     ? 'border-[#d69a8a] bg-[#fff1ea] text-[#8a2d1b]'
