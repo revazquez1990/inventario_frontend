@@ -72,7 +72,7 @@ export function SyncStatusButton() {
       onClick={sync}
       disabled={!canSync || isPending}
       title={`Última sincronización: ${timeAgo(status.last_sync_at)}${notConfigured ? ' · Configura SYNC_CENTRAL_URL y SYNC_NODE_TOKEN' : ''}`}
-      className={`flex h-11 items-center gap-2 rounded-md border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${tone}`}
+      className={`flex h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${tone}`}
     >
       <Icon className={`size-4 ${isPending ? 'animate-spin' : ''}`} />
       <span className="hidden sm:inline">{label}</span>
